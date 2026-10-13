@@ -8,12 +8,14 @@ import {
   Plus,
   ArrowRight,
   Flame,
+  Dumbbell,
+  Moon,
+  Trophy,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useAuth } from '@/lib/auth-context';
 import { useStore } from '@/lib/store-context';
 import { allFoods } from '@/lib/food-database';
-import { sumMealNutrition } from '@/lib/calculations';
+import { BADGE_CATALOG } from '@/lib/badges';
 import { FoodItem } from '@/lib/types';
 
 const healthTips = [
@@ -25,18 +27,19 @@ const healthTips = [
   "Getting sunlight in the morning regulates your circadian rhythm.",
 ];
 
-const heatmapColor = (val: number) => {
-  if (val === 0) return 'stroke-surface-container-high';
-  if (val < 50) return 'stroke-primary/30';
-  if (val < 90) return 'stroke-primary/70';
-  return 'stroke-primary';
+const monthCellColor = (score: number) => {
+  if (score < 0) return 'bg-transparent';
+  if (score === 0) return 'bg-surface-container-high';
+  if (score < 50) return 'bg-primary/30';
+  if (score < 90) return 'bg-primary/70';
+  return 'bg-primary';
 };
 
 export default function DashboardPage() {
-  const { user } = useAuth();
   const {
-    calculations, meals, exercises, waterLogs, sleepLogs, workoutPlan,
-    getMealsForDate, getExercisesForDate, getWaterForDate, getSleepForDate,
+    profile, calculations, meals, exercises, waterLogs,
+    workoutPlan, badges, checkBadges,
+    getMealsForDate, getExercisesForDate, getWaterForDate,
   } = useStore();
   const [tipIndex, setTipIndex] = useState(0);
   const [mounted, setMounted] = useState(false);
@@ -51,6 +54,7 @@ export default function DashboardPage() {
   useEffect(() => {
     setMounted(true);
     setTipIndex(Math.floor(Math.random() * healthTips.length));
+    checkBadges();
     const interval = setInterval(() => {
       setTipIndex((prev) => (prev + 1) % healthTips.length);
     }, 5000);
@@ -60,8 +64,23 @@ export default function DashboardPage() {
   const today = new Date().toISOString().split('T')[0];
   const todayMeals = useMemo(() => getMealsForDate(today), [meals, today]);
   const todayWaterMl = useMemo(() => getWaterForDate(today), [waterLogs, today]);
-  const todaySleep = useMemo(() => getSleepForDate(today), [sleepLogs, today]);
   const hydrationTarget = calculations?.hydration || 0;
+
+  const todayPlan = useMemo(() => {
+    if (!workoutPlan || workoutPlan.exercises.length === 0) return { state: 'none' as const };
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const todayName = dayNames[new Date().getDay()];
+    const todayExs = workoutPlan.exercises.filter((e) => e.day === todayName);
+    if (todayExs.length > 0) return { state: 'today' as const, day: todayName, count: todayExs.length };
+    const weekOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const todayIdx = (new Date().getDay() + 6) % 7;
+    for (let i = 1; i <= 7; i++) {
+      const name = weekOrder[(todayIdx + i) % 7];
+      const exs = workoutPlan.exercises.filter((e) => e.day === name);
+      if (exs.length > 0) return { state: 'rest' as const, nextDay: name, nextCount: exs.length };
+    }
+    return { state: 'none' as const };
+  }, [workoutPlan]);
 
   const manualGoals = useRef<Set<number>>(new Set());
 
@@ -100,51 +119,48 @@ export default function DashboardPage() {
     return count;
   }, [meals, exercises]);
 
-  const totalCalories = useMemo(() => sumMealNutrition(todayMeals).calories, [todayMeals]);
-
-  const weeklyWorkouts = useMemo(() => {
-    const now = new Date();
-    const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - now.getDay());
-    let count = 0;
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(weekStart);
-      d.setDate(weekStart.getDate() + i);
-      if (d > now) break;
-      const dateStr = d.toISOString().split('T')[0];
-      if (getExercisesForDate(dateStr).length > 0) count++;
-    }
-    return count;
-  }, [exercises]);
-
-  const targetWorkouts = workoutPlan?.daysPerWeek || 5;
-  const streakPct = Math.min(Math.round((streak / 7) * 100), 100);
-  const activityPct = Math.min(Math.round((weeklyWorkouts / targetWorkouts) * 100), 100);
-  const sleepPct = Math.min(Math.round((todaySleep / 8) * 100), 100);
-
-  const nutritionPct = useMemo(() => {
-    if (!calculations) return 0;
-    const target = calculations.targetCalories;
-    if (target === 0) return 0;
-    return Math.min(Math.round((totalCalories / target) * 100), 100);
-  }, [totalCalories, calculations]);
-
-  // Compute heatmap from real daily activity
-  const heatmapValues = useMemo(() => {
-    const now = new Date();
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(now);
-      d.setDate(now.getDate() - (6 - i));
-      const dateStr = d.toISOString().split('T')[0];
+  // GitHub-style month grid from real daily activity (last 5 weeks, Monday-aligned)
+  const monthWeeks = useMemo(() => {
+    const end = new Date();
+    const start = new Date(end);
+    start.setDate(end.getDate() - 34);
+    const dow = (start.getDay() + 6) % 7;
+    start.setDate(start.getDate() - dow);
+    const cells: { dateStr: string; score: number; isToday: boolean; empty: boolean }[] = [];
+    const cur = new Date(start);
+    while (cur <= end) {
+      const dateStr = cur.toISOString().split('T')[0];
       const dayMeals = getMealsForDate(dateStr);
       const dayExercises = getExercisesForDate(dateStr);
       let score = 0;
       if (dayMeals.length > 0) score += 40;
       if (dayExercises.length > 0) score += 40;
       if (dayMeals.length > 2) score += 20;
-      return Math.min(score, 100);
+      cells.push({ dateStr, score: Math.min(score, 100), isToday: dateStr === today, empty: false });
+      cur.setDate(cur.getDate() + 1);
+    }
+    while (cells.length % 7 !== 0) {
+      cells.push({ dateStr: '', score: -1, isToday: false, empty: true });
+    }
+    const weeks: typeof cells[] = [];
+    for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+    return weeks;
+  }, [meals, exercises, today]);
+
+  const activeDays = monthWeeks.flat().filter((c) => !c.empty && c.score > 0).length;
+
+  // All-time best weight per exercise (Personal Records)
+  const personalRecords = useMemo(() => {
+    const best = new Map<string, { name: string; weight: number; date: string }>();
+    exercises.forEach((e) => {
+      if (!e.weight || e.weight <= 0) return;
+      const prev = best.get(e.exerciseId);
+      if (!prev || e.weight > prev.weight) {
+        best.set(e.exerciseId, { name: e.exerciseName, weight: e.weight, date: e.loggedAt.split('T')[0] });
+      }
     });
-  }, [meals, exercises]);
+    return Array.from(best.values()).sort((a, b) => b.weight - a.weight).slice(0, 5);
+  }, [exercises]);
 
   const handleFoodSearch = (query: string) => {
     setFoodSearch(query);
@@ -158,6 +174,14 @@ export default function DashboardPage() {
     setSearchResults(results);
   };
 
+  const greeting = (() => {
+    if (!mounted) return 'Hello';
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  })();
+
   return (
     <DashboardLayout title="Dashboard" subtitle="">
       <div className="max-w-7xl mx-auto space-y-6 pb-8">
@@ -167,7 +191,7 @@ export default function DashboardPage() {
             {/* Hero Section */}
             <section className="col-span-4 md:col-span-8 flex flex-col justify-center gap-3 rounded-xl">
               <h1 className="text-2xl md:text-display-lg font-bold text-on-background">
-                Good morning, <span className="text-primary">{user?.username || 'User'}</span>.
+                {greeting}, <span className="text-primary">{profile?.name || 'there'}</span>.
               </h1>
               <p className="text-body-lg text-on-surface-variant max-w-2xl">
                 {streak > 0
@@ -201,69 +225,131 @@ export default function DashboardPage() {
             </section>
           </div>
 
-          {/* Activity Pulse + Daily Goals Row */}
+          {/* Today's Workout Row */}
           <div className="col-span-4 md:col-span-12 grid grid-cols-4 md:grid-cols-12 gap-4 md:gap-6">
-            {/* Activity Pulse */}
+            {/* Today's Workout */}
+            <section className="col-span-4 md:col-span-12 bg-surface rounded-xl border border-outline-variant shadow-[0_4px_15px_4px_rgba(15,23,42,0.04)] p-5 flex flex-col">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-headline-md font-semibold text-on-background">Today&rsquo;s Workout</h2>
+                <Dumbbell className="w-[18px] h-[18px] text-primary" />
+              </div>
+              <div className="flex-1 flex flex-col md:flex-row md:items-center gap-4">
+                {todayPlan.state === 'today' && (
+                  <>
+                    <div className="flex-1 bg-primary/5 border border-primary/10 rounded-xl p-4">
+                      <p className="text-label-md text-on-surface-variant">{todayPlan.day}</p>
+                      <p className="text-headline-md font-bold text-on-surface">{todayPlan.count} exercises</p>
+                      <p className="text-label-md text-on-surface-variant mt-0.5">Scheduled for today</p>
+                    </div>
+                    <Link
+                      href="/exercise-plan"
+                      className="h-12 px-8 bg-primary text-on-primary rounded-lg text-label-md font-bold hover:bg-primary/90 shadow-sm transition-all flex items-center justify-center gap-2"
+                    >
+                      Start Workout <ArrowRight className="w-4 h-4" />
+                    </Link>
+                  </>
+                )}
+                {todayPlan.state === 'rest' && (
+                  <>
+                    <div className="flex-1 flex items-center gap-3 bg-surface-container rounded-xl p-4">
+                      <div className="w-10 h-10 shrink-0 rounded-full bg-surface-container-high flex items-center justify-center">
+                        <Moon className="w-5 h-5 text-on-surface-variant" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-body-md font-bold text-on-surface">Rest Day</p>
+                        <p className="text-label-md text-on-surface-variant truncate">
+                          Next: {todayPlan.nextDay} · {todayPlan.nextCount} exercises
+                        </p>
+                      </div>
+                    </div>
+                    <Link
+                      href="/exercise-plan"
+                      className="h-12 px-8 border border-outline-variant text-on-surface hover:bg-surface-container rounded-lg text-label-md font-bold transition-all flex items-center justify-center gap-2"
+                    >
+                      View Full Plan <ArrowRight className="w-4 h-4" />
+                    </Link>
+                  </>
+                )}
+                {todayPlan.state === 'none' && (
+                  <>
+                    <div className="flex-1 flex flex-col gap-1">
+                      <p className="text-body-md font-bold text-on-surface">No plan yet</p>
+                      <p className="text-label-md text-on-surface-variant">
+                        Generate a personalized workout plan to see today&rsquo;s session here.
+                      </p>
+                    </div>
+                    <Link
+                      href="/exercise-plan"
+                      className="h-12 px-8 bg-primary text-on-primary rounded-lg text-label-md font-bold hover:bg-primary/90 shadow-sm transition-all flex items-center justify-center gap-2"
+                    >
+                      Generate Plan <ArrowRight className="w-4 h-4" />
+                    </Link>
+                  </>
+                )}
+              </div>
+            </section>
+          </div>
+
+          {/* Month Heatmap + Daily Goals Row */}
+          <div className="col-span-4 md:col-span-12 grid grid-cols-4 md:grid-cols-12 gap-4 md:gap-6">
+            {/* Month Heatmap */}
             <section className="col-span-4 md:col-span-8 bg-surface rounded-xl border border-outline-variant shadow-[0_4px_15px_4px_rgba(15,23,42,0.04)] p-5 flex flex-col">
-              <div className="flex justify-between items-center mb-5">
-                <h2 className="text-headline-md font-semibold text-on-background">Activity Pulse</h2>
+              <div className="flex flex-wrap justify-between items-start gap-3 mb-5">
+                <div>
+                  <h2 className="text-headline-md font-semibold text-on-background">Consistency</h2>
+                  <p className="text-label-md text-on-surface-variant mt-1">
+                    Log meals or workouts to light up a day. Keep the chain going!
+                  </p>
+                </div>
                 <div className="flex items-center gap-2 bg-primary/10 px-3 py-1 rounded-full">
                   <Flame className="w-[18px] h-[18px] text-primary" />
                   <span className="text-label-md font-bold text-primary">{streak} Day Streak</span>
                 </div>
               </div>
-              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-5 items-center">
-                {/* Heat Map */}
-                <div className="flex flex-col gap-3">
-                  <span className="text-label-md text-on-surface-variant font-medium">Last 7 Days Intensity</span>
-                  <div className="flex gap-2">
-                    {heatmapValues.map((val, i) => (
-                      <div key={i} className="flex-1 aspect-square relative">
-                        <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                          <circle className="stroke-surface-container-high" cx="18" cy="18" fill="none" r="14" strokeWidth="4" />
-                      <circle
-                        className={heatmapColor(val)}
-                        cx="18"
-                        cy="18"
-                        fill="none"
-                        r="14"
-                        pathLength={100}
-                        strokeDasharray={`${val} ${100 - val}`}
-                        strokeLinecap="round"
-                        strokeWidth="4"
-                      />
-                        </svg>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex justify-between text-[10px] text-outline uppercase tracking-tighter">
-                    <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
-                  </div>
+              {/* Month header + grid */}
+              <div className="flex gap-2">
+                {/* Weekday labels */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="h-4 mb-1" />
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => (
+                    <span key={i} className="h-6 md:h-7 flex items-center text-[10px] text-on-surface-variant leading-none">{d}</span>
+                  ))}
                 </div>
-
-                {/* Streak Ring */}
-                <div className="flex items-center justify-center">
-                  <div className="relative w-24 h-24 flex items-center justify-center">
-                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" fill="none" r="40" stroke="#eff4ff" strokeWidth="8" />
-                      <circle
-                        className="transition-all duration-1000"
-                        cx="50"
-                        cy="50"
-                        fill="none"
-                        r="40"
-                        stroke="#2170e4"
-                        strokeDasharray="251"
-                        strokeDashoffset={251 - (251 * streakPct) / 100}
-                        strokeLinecap="round"
-                        strokeWidth="8"
-                      />
-                    </svg>
-                    <div className="absolute flex flex-col items-center">
-                      <span className="text-headline-md font-bold text-secondary">{streak}</span>
-                      <span className="text-[10px] text-outline uppercase">Streak</span>
-                    </div>
-                  </div>
+                {/* Week columns with month labels above */}
+                <div className="flex gap-1.5">
+                  {monthWeeks.map((week, wi) => {
+                    const month = new Date(week[0].dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' });
+                    const prevMonth = wi > 0 ? new Date(monthWeeks[wi - 1][0].dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' }) : null;
+                    return (
+                      <div key={wi} className="flex flex-col items-center">
+                        <span className="h-4 text-[10px] font-semibold text-on-surface-variant leading-none">
+                          {month !== prevMonth ? month : ''}
+                        </span>
+                        <div className="flex flex-col gap-1.5 mt-1">
+                          {week.map((cell, ci) => (
+                            <div
+                              key={ci}
+                              title={cell.empty ? undefined : `${new Date(cell.dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — ${cell.score === 0 ? 'No activity' : cell.score < 50 ? 'Meals logged' : cell.score < 90 ? 'Meals + workout' : 'Full day'}`}
+                              className={`w-6 h-6 md:w-7 md:h-7 rounded-[6px] transition-colors ${monthCellColor(cell.score)}${cell.isToday ? ' ring-2 ring-primary ring-offset-2 ring-offset-surface' : ''}`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* Summary + legend */}
+              <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t border-outline-variant/60">
+                <span className="text-label-md text-on-surface-variant">
+                  <span className="font-bold text-on-surface">{activeDays}</span> of the last 35 days active
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-on-surface-variant">Less</span>
+                  {[0, 25, 60, 100].map((s) => (
+                    <div key={s} className={`w-3 h-3 rounded-[3px] ${monthCellColor(s)}`} />
+                  ))}
+                  <span className="text-[10px] text-on-surface-variant">More</span>
                 </div>
               </div>
             </section>
@@ -318,10 +404,55 @@ export default function DashboardPage() {
             </section>
           </div>
 
-          {/* Log Food + Weekly Progress Row */}
+          {/* Personal Records Row */}
+          <div className="col-span-4 md:col-span-12 grid grid-cols-4 md:grid-cols-12 gap-4 md:gap-6">
+            <section className="col-span-4 md:col-span-12 bg-surface rounded-xl border border-outline-variant shadow-[0_4px_15px_4px_rgba(15,23,42,0.04)] p-5">
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-[18px] h-[18px] text-tertiary-container" />
+                  <h2 className="text-headline-md font-semibold text-on-background">Personal Records</h2>
+                </div>
+                {personalRecords.length > 0 && (
+                  <Link href="/exercise-plan" className="text-label-md font-bold text-primary hover:underline">
+                    View Plan
+                  </Link>
+                )}
+              </div>
+              {personalRecords.length === 0 ? (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between py-2">
+                  <p className="text-body-md text-on-surface-variant">
+                    Complete weighted workouts to set your first records.
+                  </p>
+                  <Link
+                    href="/exercise-plan"
+                    className="h-11 px-6 bg-primary text-on-primary rounded-lg text-label-md font-bold hover:bg-primary/90 shadow-sm transition-all flex items-center justify-center gap-2 shrink-0"
+                  >
+                    Start Training <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  {personalRecords.map((pr) => (
+                    <div
+                      key={pr.name}
+                      className="bg-surface-container rounded-xl p-3.5 flex flex-col gap-1 min-w-0"
+                    >
+                      <span className="text-body-md font-bold text-on-surface truncate">{pr.name}</span>
+                      <span className="text-headline-md font-bold text-primary leading-tight">{pr.weight} kg</span>
+                      <span className="text-label-md text-on-surface-variant">
+                        {pr.date === today ? 'Set today' : `Set ${new Date(pr.date + 'T00:00:00').toLocaleDateString('en', { month: 'short', day: 'numeric' })}`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+
+          {/* Log Food Row */}
           <div className="col-span-4 md:col-span-12 grid grid-cols-4 md:grid-cols-12 gap-4 md:gap-6">
             {/* Log Food */}
-            <section className="col-span-4 md:col-span-6 bg-surface rounded-xl border border-outline-variant shadow-[0_4px_15px_4px_rgba(15,23,42,0.04)] p-5 flex flex-col justify-between">
+            <section className="col-span-4 md:col-span-12 bg-surface rounded-xl border border-outline-variant shadow-[0_4px_15px_4px_rgba(15,23,42,0.04)] p-5 flex flex-col justify-between">
               <div>
                 <h2 className="text-headline-md font-semibold text-on-background mb-2">
                   Eat anything new today?
@@ -367,112 +498,44 @@ export default function DashboardPage() {
                 </Link>
               </div>
             </section>
+          </div>
 
-            {/* Weekly Progress */}
-            <section className="col-span-4 md:col-span-6 bg-surface rounded-xl border border-outline-variant shadow-[0_4px_15px_4px_rgba(15,23,42,0.04)] p-5">
-              <div className="flex justify-between items-start mb-5">
-                <h2 className="text-headline-md font-semibold text-on-background">Weekly Progress</h2>
-                <span className="bg-surface-container-high text-secondary text-label-md px-2 py-1 rounded-full font-bold">
-                  {weeklyWorkouts >= 3 ? 'In Sync' : 'Get Started'}
+          {/* Achievements Row */}
+          <div className="col-span-4 md:col-span-12 grid grid-cols-4 md:grid-cols-12 gap-4 md:gap-6">
+            <section className="col-span-4 md:col-span-12 bg-surface rounded-xl border border-outline-variant shadow-[0_4px_15px_4px_rgba(15,23,42,0.04)] p-5">
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-[18px] h-[18px] text-tertiary-container" />
+                  <h2 className="text-headline-md font-semibold text-on-background">Achievements</h2>
+                </div>
+                <span className="bg-surface-container-high text-label-md px-2 py-1 rounded-full font-bold text-on-surface">
+                  {badges.length} / {BADGE_CATALOG.length}
                 </span>
               </div>
-              <div className="flex flex-col gap-4">
-                {/* Ring Charts */}
-                <div className="flex justify-around items-center py-3 gap-4">
-                  {/* Activity Ring */}
-                  <div className="relative w-24 h-24 flex items-center justify-center">
-                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" fill="none" r="45" stroke="#e5eeff" strokeWidth="8" />
-                      <circle
-                        className="transition-all duration-1000 ease-out"
-                        cx="50"
-                        cy="50"
-                        fill="none"
-                        r="45"
-                        stroke="#006c49"
-                        strokeDasharray="283"
-                        strokeDashoffset={283 - (283 * activityPct) / 100}
-                        strokeLinecap="round"
-                        strokeWidth="10"
-                      />
-                    </svg>
-                    <div className="absolute flex flex-col items-center">
-                      <span className="text-headline-md font-bold text-on-background">{activityPct}%</span>
-                      <span className="text-[8px] uppercase text-on-surface-variant">Activity</span>
-                    </div>
-                  </div>
-
-                  {/* Nutrition Ring */}
-                  <div className="relative w-20 h-20 flex items-center justify-center">
-                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" fill="none" r="45" stroke="#e5eeff" strokeWidth="8" />
-                      <circle
-                        className="transition-all duration-1000 ease-out"
-                        cx="50"
-                        cy="50"
-                        fill="none"
-                        r="45"
-                        stroke="#2170e4"
-                        strokeDasharray="283"
-                        strokeDashoffset={283 - (283 * nutritionPct) / 100}
-                        strokeLinecap="round"
-                        strokeWidth="10"
-                      />
-                    </svg>
-                    <div className="absolute flex flex-col items-center">
-                      <span className="text-label-md font-bold text-on-background">{nutritionPct}%</span>
-                      <span className="text-[8px] uppercase text-on-surface-variant">Nutrition</span>
-                    </div>
-                  </div>
-
-                  {/* Sleep Ring */}
-                  <div className="relative w-20 h-20 flex items-center justify-center">
-                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" fill="none" r="45" stroke="#e5eeff" strokeWidth="8" />
-                      <circle
-                        className="transition-all duration-1000 ease-out"
-                        cx="50"
-                        cy="50"
-                        fill="none"
-                        r="45"
-                        stroke="#855300"
-                        strokeDasharray="283"
-                        strokeDashoffset={283 - (283 * sleepPct) / 100}
-                        strokeLinecap="round"
-                        strokeWidth="10"
-                      />
-                    </svg>
-                    <div className="absolute flex flex-col items-center">
-                      <span className="text-label-md font-bold text-on-background">{todaySleep ? `${todaySleep}h` : '--'}</span>
-                      <span className="text-[8px] uppercase text-on-surface-variant">Sleep</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Progress Bars */}
-                <div className="flex flex-col gap-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-label-md text-on-surface-variant">Workouts</span>
-                    <span className="text-label-md font-bold">{weeklyWorkouts}/{targetWorkouts}</span>
-                  </div>
-                  <div className="w-full h-2 bg-surface-container-high rounded-full overflow-hidden">
+              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+                {BADGE_CATALOG.map((b) => {
+                  const unlocked = badges.some((x) => x.id === b.id);
+                  return (
                     <div
-                      className="h-full bg-primary transition-all duration-1000"
-                      style={{ width: `${Math.min((weeklyWorkouts / targetWorkouts) * 100, 100)}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between items-center mt-1">
-                    <span className="text-label-md text-on-surface-variant">Nutrition</span>
-                    <span className="text-label-md font-bold">{nutritionPct}%</span>
-                  </div>
-                  <div className="w-full h-2 bg-surface-container-high rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-secondary transition-all duration-1000"
-                      style={{ width: `${nutritionPct}%` }}
-                    />
-                  </div>
-                </div>
+                      key={b.id}
+                      title={b.description}
+                      className={`flex flex-col items-center gap-1.5 min-w-[84px] p-3 rounded-xl border transition-all ${
+                        unlocked
+                          ? 'bg-tertiary-container/10 border-tertiary-container/30'
+                          : 'bg-surface-container border-outline-variant/40 opacity-50'
+                      }`}
+                    >
+                      <span className="text-2xl leading-none">{b.icon}</span>
+                      <span className="text-[10px] font-bold text-center text-on-surface leading-tight">{b.name}</span>
+                    </div>
+                  );
+                })}
               </div>
+              {badges.length === 0 && (
+                <p className="text-label-md text-on-surface-variant mt-3">
+                  Log a meal or complete a workout to earn your first badge.
+                </p>
+              )}
             </section>
           </div>
         </div>

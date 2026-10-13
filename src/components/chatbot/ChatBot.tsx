@@ -8,7 +8,6 @@ import { findResponse, getFollowUps } from '@/lib/chatbot-responses';
 import { sumMealNutrition, estimateExerciseCalories } from '@/lib/calculations';
 import { PLAN_DAY_NAMES } from '@/lib/exercise-planner';
 import { useStore } from '@/lib/store-context';
-import { useAuth } from '@/lib/auth-context';
 import { useBackHandler } from '@/lib/back-handler';
 
 interface Message {
@@ -79,24 +78,23 @@ export default function ChatBot({ mode = 'floating', onClose }: ChatBotProps) {
   const [isTyping, setIsTyping] = useState(false);
   const [dailyCount, setDailyCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { user } = useAuth();
   const {
     profile, meals, calculations, workoutPlan,
     foodPreferences,
     getExercisesForDate, getWaterForDate, getSleepForDate,
   } = useStore();
 
-  // Greet by name once the user is known
+  // Greet by name once the profile is known
   useEffect(() => {
-    if (!user?.username) return;
+    if (!profile?.name) return;
     setMessages(prev =>
       prev.map(m =>
         m.id === 1 && m.role === 'assistant'
-          ? { ...m, content: `Hey ${user.username}! V here 👋 — good to see you! What are we working on today?` }
+          ? { ...m, content: `Hey ${profile.name}! V here 👋 — good to see you! What are we working on today?` }
           : m
       )
     );
-  }, [user?.username]);
+  }, [profile?.name]);
 
   // Build personalized context for AI (real data only)
   const chatContext = useMemo(() => {
@@ -116,7 +114,7 @@ export default function ChatBot({ mode = 'floating', onClose }: ChatBotProps) {
         : `${e.exerciseName} ${e.sets}x${e.reps}${e.weight !== undefined ? ` @${e.weight}kg` : ''}`;
 
     return {
-      username: user?.username,
+      username: profile?.name || undefined,
       profile: profile
         ? {
             gender: profile.gender,
@@ -150,7 +148,7 @@ export default function ChatBot({ mode = 'floating', onClose }: ChatBotProps) {
       allergies: foodPreferences.allergies?.length ? foodPreferences.allergies : undefined,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, meals, calculations, workoutPlan, foodPreferences, user?.id]);
+  }, [profile, meals, calculations, workoutPlan, foodPreferences]);
 
   useEffect(() => {
     setDailyCount(getDailyCount());

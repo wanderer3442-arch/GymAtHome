@@ -3,7 +3,7 @@
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Scale, Flame, Save, CheckCircle, ArrowRight } from 'lucide-react';
+import { Scale, Flame, Save, CheckCircle } from 'lucide-react';
 import { useStore } from '@/lib/store-context';
 
 type ActivityLevel = '1.2' | '1.375' | '1.55' | '1.725' | '1.9';
@@ -95,7 +95,7 @@ export default function CalculatorPage() {
   }, [gender, age, height, weight, activity]);
 
   return (
-    <DashboardLayout title="Essentials" subtitle="Calculate your foundational health metrics.">
+    <DashboardLayout title="Essentials" subtitle="Step 2 of 2 — calculate your foundational health metrics.">
       <div className="max-w-7xl mx-auto space-y-6 pb-8">
         {/* Header */}
         <header className="mb-2">
@@ -344,13 +344,13 @@ export default function CalculatorPage() {
                   setSaved(true);
                   setTimeout(() => {
                     setSaved(false);
-                    router.push('/food-intake');
+                    router.push('/dashboard');
                   }, 1000);
                 }}
                 className="w-full mt-6 bg-primary hover:bg-surface-tint text-on-primary py-3 rounded-lg text-label-md font-bold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
               >
-                {saved ? <CheckCircle className="w-4 h-4" /> : <ArrowRight className="w-4 h-4" />}
-                {saved ? 'Saved!' : 'Save & Set Up Meal Plan'}
+                {saved ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                {saved ? 'Saved!' : 'Save'}
               </button>
             </div>
           </div>

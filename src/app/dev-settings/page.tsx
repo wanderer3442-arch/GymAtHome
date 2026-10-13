@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Key, Save, CheckCircle, Eye, EyeOff, ArrowLeft, Cpu, Sparkles, Terminal } from 'lucide-react';
+import { Key, Save, CheckCircle, Eye, EyeOff, ArrowLeft, Cpu, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
 const GEMINI_MODEL = 'gemini-2.5-flash-lite';
@@ -25,8 +25,8 @@ export default function DevSettingsPage() {
         <div className="text-center">
           <h1 className="text-headline-md font-bold text-on-surface mb-2">Not Found</h1>
           <p className="text-on-surface-variant">This page is only available in development.</p>
-          <Link href="/login" className="inline-block mt-4 text-primary hover:underline text-sm">
-            Go to Login
+          <Link href="/" className="inline-block mt-4 text-primary hover:underline text-sm">
+            Go to app
           </Link>
         </div>
       </div>
@@ -52,7 +52,7 @@ export default function DevSettingsPage() {
     <div className="min-h-screen bg-surface-container-lowest flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-surface rounded-2xl shadow-elevated border border-outline-variant/30 p-8">
         <div className="flex items-center gap-3 mb-6">
-          <Link href="/login" className="p-2 hover:bg-surface-container rounded-lg">
+          <Link href="/" className="p-2 hover:bg-surface-container rounded-lg">
             <ArrowLeft className="w-5 h-5 text-on-surface-variant" />
           </Link>
           <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
@@ -174,14 +174,6 @@ export default function DevSettingsPage() {
         <p className="text-xs text-on-surface-variant/60 text-center mt-6">
           Free tier: 15 requests/min • Key stored in browser only
         </p>
-
-        <Link
-          href="/dev-console"
-          className="mt-4 w-full py-2.5 bg-surface-container hover:bg-surface-container-high border border-outline-variant rounded-xl text-sm font-medium text-on-surface transition-colors flex items-center justify-center gap-2"
-        >
-          <Terminal className="w-4 h-4" />
-          Open Dev Console
-        </Link>
       </div>
     </div>
   );

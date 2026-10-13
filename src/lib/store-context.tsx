@@ -15,8 +15,58 @@ import {
   Badge,
 } from './types';
 import { calculateAll } from './calculations';
-import { useAuth } from './auth-context';
 import { allFoods } from './food-database';
+import { BADGE_CATALOG } from './badges';
+
+// Single-device store. Replaces the old per-account `gymathome_store_<id>` keys
+// left behind by the removed sign-in flow.
+export const GYMATHOME_STORE_KEY = 'gymathome_store';
+
+export function migrateLegacyStore(): void {
+  try {
+    if (localStorage.getItem(GYMATHOME_STORE_KEY)) return;
+
+    const candidates: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('gymathome_store_')) candidates.push(k);
+    }
+    if (candidates.length === 0) return;
+
+    // Prefer the store belonging to the last active session, else the largest one.
+    let chosen: string | null = null;
+    try {
+      const session = JSON.parse(localStorage.getItem('gymathome_auth') || 'null');
+      const id = session?.user?.id;
+      if (id && candidates.includes(`gymathome_store_${id}`)) {
+        chosen = `gymathome_store_${id}`;
+      }
+    } catch {
+      // fall through to largest-store heuristic
+    }
+    if (!chosen) {
+      chosen = candidates.reduce((a, b) =>
+        (localStorage.getItem(a) || '').length >= (localStorage.getItem(b) || '').length ? a : b
+      );
+    }
+    const data = localStorage.getItem(chosen);
+    if (data) localStorage.setItem(GYMATHOME_STORE_KEY, data);
+  } catch {
+    // migration is best-effort; a fresh store is created on save
+  }
+}
+
+export function readStoredProfile(): Profile | null {
+  try {
+    migrateLegacyStore();
+    const raw = localStorage.getItem(GYMATHOME_STORE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.profile ?? null;
+  } catch {
+    return null;
+  }
+}
 
 interface StoreContextType {
   profile: Profile;
@@ -64,9 +114,11 @@ interface StoreContextType {
 
   isProfileSet: boolean;
   setIsProfileSet: (val: boolean) => void;
+  hydrated: boolean;
 }
 
 const defaultProfile: Profile = {
+  name: null,
   gender: null,
   age: null,
   height: null,
@@ -76,10 +128,20 @@ const defaultProfile: Profile = {
   healthProblems: [],
 };
 
+const defaultFoodPreferences = (): WeeklyFoodPreference => ({
+  monday: { breakfast: [], lunch: [], dinner: [] },
+  tuesday: { breakfast: [], lunch: [], dinner: [] },
+  wednesday: { breakfast: [], lunch: [], dinner: [] },
+  thursday: { breakfast: [], lunch: [], dinner: [] },
+  friday: { breakfast: [], lunch: [], dinner: [] },
+  saturday: { breakfast: [], lunch: [], dinner: [] },
+  sunday: { breakfast: [], lunch: [], dinner: [] },
+  allergies: [],
+});
+
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
   const [profile, setProfile] = useState<Profile>(defaultProfile);
   const [calculations, setCalculations] = useState<Calculations | null>(null);
   const [meals, setMeals] = useState<MealEntry[]>([]);
@@ -87,52 +149,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | null>(null);
   const [bodyMetrics, setBodyMetrics] = useState<BodyMetric[]>([]);
-  const [foodPreferences, setFoodPreferences] = useState<WeeklyFoodPreference>({
-    monday: { breakfast: [], lunch: [], dinner: [] },
-    tuesday: { breakfast: [], lunch: [], dinner: [] },
-    wednesday: { breakfast: [], lunch: [], dinner: [] },
-    thursday: { breakfast: [], lunch: [], dinner: [] },
-    friday: { breakfast: [], lunch: [], dinner: [] },
-    saturday: { breakfast: [], lunch: [], dinner: [] },
-    sunday: { breakfast: [], lunch: [], dinner: [] },
-    allergies: [],
-  });
+  const [foodPreferences, setFoodPreferences] = useState<WeeklyFoodPreference>(defaultFoodPreferences());
   const [waterLogs, setWaterLogs] = useState<WaterLog[]>([]);
   const [sleepLogs, setSleepLogs] = useState<SleepLog[]>([]);
   const [badges, setBadges] = useState<Badge[]>([]);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isProfileSet, setIsProfileSet] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
-  // Load data when user changes (login/logout)
+  // Load data from the single local store on mount
   useEffect(() => {
-    if (!user?.id) {
-      // No user logged in - reset to defaults
-      setProfile(defaultProfile);
-      setMeals([]);
-      setExercises([]);
-      setHabits([]);
-      setWorkoutPlan(null);
-      setBodyMetrics([]);
-      setFoodPreferences({
-        monday: { breakfast: [], lunch: [], dinner: [] },
-        tuesday: { breakfast: [], lunch: [], dinner: [] },
-        wednesday: { breakfast: [], lunch: [], dinner: [] },
-        thursday: { breakfast: [], lunch: [], dinner: [] },
-        friday: { breakfast: [], lunch: [], dinner: [] },
-        saturday: { breakfast: [], lunch: [], dinner: [] },
-        sunday: { breakfast: [], lunch: [], dinner: [] },
-        allergies: [],
-      });
-      setWaterLogs([]);
-      setSleepLogs([]);
-      setBadges([]);
-      setIsProfileSet(false);
-      return;
-    }
-
-    // Load user-specific data
-    const storageKey = `gymathome_store_${user.id}`;
-    const saved = localStorage.getItem(storageKey);
+    migrateLegacyStore();
+    const saved = localStorage.getItem(GYMATHOME_STORE_KEY);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -156,39 +184,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (parsed.theme) setTheme(parsed.theme);
         if (parsed.isProfileSet) setIsProfileSet(parsed.isProfileSet);
       } catch {
-        localStorage.removeItem(storageKey);
+        localStorage.removeItem(GYMATHOME_STORE_KEY);
       }
-    } else {
-      // First time user - reset to defaults
-      setProfile(defaultProfile);
-      setMeals([]);
-      setExercises([]);
-      setHabits([]);
-      setWorkoutPlan(null);
-      setBodyMetrics([]);
-      setFoodPreferences({
-        monday: { breakfast: [], lunch: [], dinner: [] },
-        tuesday: { breakfast: [], lunch: [], dinner: [] },
-        wednesday: { breakfast: [], lunch: [], dinner: [] },
-        thursday: { breakfast: [], lunch: [], dinner: [] },
-        friday: { breakfast: [], lunch: [], dinner: [] },
-        saturday: { breakfast: [], lunch: [], dinner: [] },
-        sunday: { breakfast: [], lunch: [], dinner: [] },
-        allergies: [],
-      });
-      setWaterLogs([]);
-      setSleepLogs([]);
-      setBadges([]);
-      setIsProfileSet(false);
     }
-  }, [user?.id]);
+    setLoaded(true);
+  }, []);
 
-  // Save data to user-specific localStorage
+  // Save data to localStorage
   useEffect(() => {
-    if (!user?.id) return;
-    const storageKey = `gymathome_store_${user.id}`;
+    if (!loaded) return;
     localStorage.setItem(
-      storageKey,
+      GYMATHOME_STORE_KEY,
       JSON.stringify({
         profile,
         meals,
@@ -204,7 +210,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         isProfileSet,
       })
     );
-  }, [user?.id, profile, meals, exercises, habits, workoutPlan, bodyMetrics, foodPreferences, waterLogs, sleepLogs, badges, theme, isProfileSet]);
+  }, [loaded, profile, meals, exercises, habits, workoutPlan, bodyMetrics, foodPreferences, waterLogs, sleepLogs, badges, theme, isProfileSet]);
 
   const recalculate = () => {
     const calc = calculateAll(profile);
@@ -312,6 +318,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     const hasBadge = (id: string) => badges.some(b => b.id === id);
 
+    const pushBadge = (id: string) => {
+      const def = BADGE_CATALOG.find(b => b.id === id);
+      if (def) newBadges.push({ ...def, unlockedAt: today });
+    };
+
     // 7-day streak
     if (!hasBadge('streak_7')) {
       let streak = 0;
@@ -326,23 +337,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         d.setDate(d.getDate() - 1);
       }
       if (streak >= 7) {
-        newBadges.push({ id: 'streak_7', name: '7-Day Streak', description: 'Logged meals or exercises for 7 consecutive days', icon: '\uD83D\uDD25', unlockedAt: today, condition: 'streak_7' });
+        pushBadge('streak_7');
       }
     }
 
     // 100 meals logged
     if (!hasBadge('meals_100') && meals.length >= 100) {
-      newBadges.push({ id: 'meals_100', name: 'Meal Master', description: 'Logged 100 meals', icon: '\uD83C\uDF7D\uFE0F', unlockedAt: today, condition: 'meals_100' });
+      pushBadge('meals_100');
     }
 
     // 10 workouts
     if (!hasBadge('workouts_10') && exercises.length >= 10) {
-      newBadges.push({ id: 'workouts_10', name: 'Gym Warrior', description: 'Completed 10 workouts', icon: '\uD83C\uDFCB\uFE0F', unlockedAt: today, condition: 'workouts_10' });
+      pushBadge('workouts_10');
     }
 
     // 50 workouts
     if (!hasBadge('workouts_50') && exercises.length >= 50) {
-      newBadges.push({ id: 'workouts_50', name: 'Iron Legend', description: 'Completed 50 workouts', icon: '\uD83D\uDCAA', unlockedAt: today, condition: 'workouts_50' });
+      pushBadge('workouts_50');
     }
 
     // 7-day water tracking
@@ -355,7 +366,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         d.setDate(d.getDate() - 1);
       }
       if (waterDays >= 7) {
-        newBadges.push({ id: 'water_7', name: 'Hydration Hero', description: 'Tracked water intake for 7 days', icon: '\uD83D\uDCA7', unlockedAt: today, condition: 'water_7' });
+        pushBadge('water_7');
       }
     }
 
@@ -375,18 +386,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         d.setDate(d.getDate() - 1);
       }
       if (proteinDays >= 5) {
-        newBadges.push({ id: 'protein_5', name: 'Protein Pro', description: 'Hit protein target 5 days in 30', icon: '\uD83E\uDD69', unlockedAt: today, condition: 'protein_5' });
+        pushBadge('protein_5');
       }
     }
 
     // First meal logged
     if (!hasBadge('first_meal') && meals.length >= 1) {
-      newBadges.push({ id: 'first_meal', name: 'First Bite', description: 'Logged your first meal', icon: '\uD83C\uDF1F', unlockedAt: today, condition: 'first_meal' });
+      pushBadge('first_meal');
     }
 
     // First workout
     if (!hasBadge('first_workout') && exercises.length >= 1) {
-      newBadges.push({ id: 'first_workout', name: 'First Rep', description: 'Completed your first workout', icon: '\u26A1', unlockedAt: today, condition: 'first_workout' });
+      pushBadge('first_workout');
     }
 
     if (newBadges.length > 0) {
@@ -435,6 +446,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         toggleTheme,
         isProfileSet,
         setIsProfileSet,
+        hydrated: loaded,
       }}
     >
       {children}

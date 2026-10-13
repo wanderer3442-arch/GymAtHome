@@ -1,9 +1,8 @@
 'use client';
 
-import { ChevronDown, User, LogOut, Sun, Moon, Menu } from 'lucide-react';
+import { ChevronDown, User, Sun, Moon, Menu } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth-context';
 import { useStore } from '@/lib/store-context';
 import { useSidebar } from '@/lib/sidebar-context';
 
@@ -15,8 +14,7 @@ interface HeaderProps {
 export default function Header({ title, subtitle }: HeaderProps) {
   const [showProfile, setShowProfile] = useState(false);
   const router = useRouter();
-  const { logout, user } = useAuth();
-  const { theme, toggleTheme } = useStore();
+  const { profile, theme, toggleTheme } = useStore();
   const { setMobileOpen } = useSidebar();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -30,10 +28,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
-    logout();
-    router.push('/login');
-  };
+  const displayName = profile?.name || 'User';
 
   return (
     <header className="h-16 bg-surface-container-lowest border-b border-outline-variant/30 flex items-center justify-between px-4 md:px-6">
@@ -74,7 +69,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
           >
             <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
               <span className="text-sm font-medium text-primary">
-                {user?.username?.slice(0, 2).toUpperCase() || 'U'}
+                {displayName.slice(0, 2).toUpperCase()}
               </span>
             </div>
             <ChevronDown className={`w-4 h-4 text-on-surface-variant hidden sm:block transition-transform ${showProfile ? 'rotate-180' : ''}`} />
@@ -83,8 +78,8 @@ export default function Header({ title, subtitle }: HeaderProps) {
           {showProfile && (
             <div className="absolute right-0 top-12 w-56 bg-surface-container-lowest border border-outline-variant/30 rounded-xl shadow-elevated z-50 overflow-hidden">
               <div className="p-4 border-b border-outline-variant/30">
-                <p className="text-sm font-bold text-on-surface">{user?.username || 'User'}</p>
-                <p className="text-xs text-on-surface-variant">{user?.email || ''}</p>
+                <p className="text-sm font-bold text-on-surface">{displayName}</p>
+                <p className="text-xs text-on-surface-variant">All data stays on this device</p>
               </div>
               <div className="py-2">
                 <button
@@ -93,14 +88,6 @@ export default function Header({ title, subtitle }: HeaderProps) {
                 >
                   <User className="w-4 h-4 text-on-surface-variant" />
                   Profile
-                </button>
-                <div className="border-t border-outline-variant/30 my-1" />
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-error-container/50 text-error text-sm transition-colors"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Sign Out
                 </button>
               </div>
             </div>

@@ -4,7 +4,6 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useState, useMemo, useEffect } from 'react';
 import {
   User,
-  Mail,
   Calendar,
   Edit,
   Target,
@@ -26,15 +25,11 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { useAuth } from '@/lib/auth-context';
-import { useStore } from '@/lib/store-context';
+import { useStore, GYMATHOME_STORE_KEY } from '@/lib/store-context';
 import { estimateExerciseCalories } from '@/lib/calculations';
 import { useBackHandler } from '@/lib/back-handler';
-import { useRouter } from 'next/navigation';
 
 export default function ProfilePage() {
-  const { user, updateUsername, deleteAccount } = useAuth();
-  const router = useRouter();
   const {
     profile,
     updateProfile,
@@ -51,7 +46,7 @@ export default function ProfilePage() {
   } = useStore();
 
   const [editing, setEditing] = useState(false);
-  const [editUsername, setEditUsername] = useState(user?.username || '');
+  const [editName, setEditName] = useState(profile.name || '');
   const [editAge, setEditAge] = useState(profile.age ? String(profile.age) : '');
   const [editHeight, setEditHeight] = useState(profile.height ? String(profile.height) : '');
   const [editWeight, setEditWeight] = useState(profile.weight ? String(profile.weight) : '');
@@ -106,10 +101,8 @@ export default function ProfilePage() {
   }, []);
 
   const handleSave = () => {
-    if (editUsername.trim() && editUsername !== user?.username) {
-      updateUsername(editUsername.trim());
-    }
     updateProfile({
+      name: editName.trim() || profile.name,
       gender: editGender,
       age: parseFloat(editAge) || 25,
       height: parseFloat(editHeight) || 175,
@@ -122,10 +115,6 @@ export default function ProfilePage() {
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
-
-  const memberSince = user?.createdAt
-    ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-    : 'Recently';
 
   const bmiCategory = calculations?.bmiCategory || 'N/A';
 
@@ -142,23 +131,16 @@ export default function ProfilePage() {
               {editing ? (
                 <input
                   type="text"
-                  value={editUsername}
-                  onChange={(e) => setEditUsername(e.target.value)}
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
                   className="text-headline-md font-semibold text-on-surface text-center w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-1 outline-none focus:border-primary"
                 />
               ) : (
-                <h2 className="text-headline-md font-semibold text-on-surface">{user?.username || 'User'}</h2>
+                <h2 className="text-headline-md font-semibold text-on-surface">{profile.name || 'User'}</h2>
               )}
-              <p className="text-sm text-on-surface-variant mt-2">
-                Member since {memberSince}
-              </p>
             </div>
 
             <div className="mt-6 space-y-3">
-              <div className="flex items-center gap-3 text-sm">
-                <Mail className="w-4 h-4 text-on-surface-variant" />
-                <span className="text-on-surface-variant">{user?.email || 'Not set'}</span>
-              </div>
               <div className="flex items-center gap-3 text-sm">
                 <Calendar className="w-4 h-4 text-on-surface-variant" />
                 <span className="text-on-surface-variant">Age: {editing ? editAge : (profile.age || 'Not set')} years</span>
@@ -189,7 +171,10 @@ export default function ProfilePage() {
               </div>
             ) : (
               <button
-                onClick={() => setEditing(true)}
+                onClick={() => {
+                  setEditName(profile.name || '');
+                  setEditing(true);
+                }}
                 className="w-full mt-6 h-10 border border-secondary text-secondary rounded-lg text-label-md font-medium hover:bg-secondary/5 transition-colors flex items-center justify-center gap-2"
               >
                 <Edit className="w-4 h-4" />
@@ -492,15 +477,15 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Danger zone — account deletion */}
+        {/* Danger zone — local data deletion */}
         <div className="bg-surface rounded-xl border border-error/40 p-6 mt-6">
           <h2 className="text-headline-md font-semibold text-on-surface mb-2 flex items-center gap-2">
             <Trash2 className="w-5 h-5 text-error" />
-            Delete Account
+            Delete All Data
           </h2>
           <p className="text-sm text-on-surface-variant mb-1">
-            Permanently deletes your account and every workout, meal, health metric, badge and preference
-            stored on this device. This cannot be undone.
+            Permanently erases every workout, meal, health metric, badge and preference stored on this
+            device, including your profile. This cannot be undone.
           </p>
           <p className="text-sm text-on-surface-variant mb-4">
             Want a backup first?{' '}
@@ -516,7 +501,7 @@ export default function ProfilePage() {
             }}
             className="px-4 py-2.5 rounded-lg border border-error text-error text-sm font-semibold hover:bg-error/5 active:scale-98 transition"
           >
-            Delete account…
+            Delete all data…
           </button>
         </div>
 
@@ -539,7 +524,7 @@ export default function ProfilePage() {
                     <TriangleAlert className="w-5 h-5 text-error" />
                   </div>
                   <h3 id="delete-account-title" className="text-lg font-semibold text-on-surface">
-                    Delete account?
+                    Delete all data?
                   </h3>
                 </div>
                 <button
@@ -552,7 +537,7 @@ export default function ProfilePage() {
               </div>
 
               <p className="text-sm text-on-surface-variant mb-4">
-                Your account and all data on this device will be erased immediately &mdash; profile,
+                Your profile and all data on this device will be erased immediately &mdash; profile,
                 workouts, meals, metrics and badges. This cannot be recovered.
               </p>
 
@@ -580,9 +565,19 @@ export default function ProfilePage() {
                 <button
                   disabled={deleteConfirmText.trim() !== 'DELETE'}
                   onClick={() => {
-                    deleteAccount();
+                    try {
+                      localStorage.removeItem(GYMATHOME_STORE_KEY);
+                      Object.keys(localStorage)
+                        .filter((k) => k.startsWith('gymathome_store_'))
+                        .forEach((k) => localStorage.removeItem(k));
+                      Object.keys(localStorage)
+                        .filter((k) => k.startsWith('gymathome_chat_count_'))
+                        .forEach((k) => localStorage.removeItem(k));
+                    } catch {
+                      // best-effort wipe
+                    }
                     setShowDeleteModal(false);
-                    router.push('/login');
+                    window.location.href = '/';
                   }}
                   className="flex-1 px-4 py-3 rounded-lg bg-error text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110"
                 >

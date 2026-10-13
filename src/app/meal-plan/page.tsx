@@ -1,8 +1,9 @@
 'use client';
 
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import Link from 'next/link';
 import { useState, useMemo } from 'react';
-import { Check, Sun, CloudSun, Moon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, Sun, CloudSun, Moon, ChevronLeft, ChevronRight, UtensilsCrossed } from 'lucide-react';
 import { useStore } from '@/lib/store-context';
 import { sumMealNutrition, getFoodById } from '@/lib/calculations';
 import { DayFoodIntake } from '@/lib/types';
@@ -198,8 +199,31 @@ export default function MealPlanPage() {
   }, [foodPreferences, weekOffset, today]);
 
   return (
-    <DashboardLayout title="Meal Plan" subtitle="Tick what you've eaten today">
+    <DashboardLayout title="Meal Plan" subtitle={totalPlannedItems > 0 ? `${totalPlannedItems} foods planned today` : 'Set up your weekly meal plan to get started'}>
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
+
+        {/* Header — mirrors the exercise plan page */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4">
+          <div>
+            <h1 className="text-2xl md:text-display-lg font-bold text-on-surface mb-1">
+              Meal Plan
+            </h1>
+            <p className="text-sm md:text-body-lg text-on-surface-variant">
+              {totalPlannedItems > 0
+                ? `${totalPlannedItems} foods planned for today — tap to mark what you eat`
+                : 'Set up your weekly meals based on your goals and preferences'}
+            </p>
+          </div>
+          <div className="flex gap-3 flex-wrap">
+            <Link
+              href="/food-intake"
+              className="px-4 py-2 rounded-lg bg-primary text-on-primary text-label-md font-medium hover:bg-primary/90 transition-colors shadow-sm flex items-center gap-2"
+            >
+              <UtensilsCrossed className="w-5 h-5" />
+              {totalPlannedItems > 0 ? 'Edit Meal Plan' : 'Set Up Meal Plan'}
+            </Link>
+          </div>
+        </div>
 
         {/* Row 1: Overview — full width */}
         <section className="bg-surface rounded-xl p-6 shadow-elevated border border-outline-variant">

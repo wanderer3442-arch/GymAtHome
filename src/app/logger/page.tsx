@@ -186,7 +186,7 @@ export default function LoggerPage() {
           </div>
 
           {/* Category Tabs */}
-          <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+          <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-2">
             {habitCategories.map((cat) => (
               <button
                 key={cat.id}
@@ -480,7 +480,7 @@ export default function LoggerPage() {
           ) : (
             <div>
               {/* Calendar Grid */}
-              <div className="overflow-x-auto pb-2">
+              <div className="overflow-x-auto no-scrollbar pb-2">
                 {(() => {
                   const today = new Date();
                   const startDay = today.getDay();

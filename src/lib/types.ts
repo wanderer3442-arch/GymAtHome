@@ -1,18 +1,3 @@
-// ─── User & Auth ─────────────────────────────────────────────────────────────
-
-export interface User {
-  id: string;
-  email: string;
-  username: string;
-  createdAt: string;
-  role?: 'user' | 'admin';
-}
-
-export interface AuthState {
-  user: User | null;
-  isAuthenticated: boolean;
-}
-
 // ─── Profile ─────────────────────────────────────────────────────────────────
 
 export type Gender = 'male' | 'female' | 'other';
@@ -22,6 +7,7 @@ export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'very_active' |
 export type Goal = 'lose' | 'maintain' | 'gain';
 
 export interface Profile {
+  name: string | null;
   gender: Gender | null;
   age: number | null;
   height: number | null; // cm

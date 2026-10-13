@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "@/lib/auth-context";
 import { StoreProvider } from "@/lib/store-context";
 import { SidebarProvider } from "@/lib/sidebar-context";
 import DatabaseInit from "@/components/DatabaseInit";
@@ -53,14 +52,12 @@ export default function RootLayout({
       </head>
       <body className="min-h-full bg-surface text-on-surface antialiased">
         <DatabaseInit>
-          <AuthProvider>
-            <StoreProvider>
-              <SidebarProvider>
-                {children}
-                <BackButtonHandler />
-              </SidebarProvider>
-            </StoreProvider>
-          </AuthProvider>
+          <StoreProvider>
+            <SidebarProvider>
+              {children}
+              <BackButtonHandler />
+            </SidebarProvider>
+          </StoreProvider>
         </DatabaseInit>
       </body>
     </html>

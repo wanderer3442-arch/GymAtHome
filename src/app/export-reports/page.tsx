@@ -3,8 +3,7 @@
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useState, useEffect } from 'react';
 import {
-  Download,
-  Mail,
+  Share2,
   ChevronDown,
   Eye,
   Activity,
@@ -21,7 +20,6 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useAuth } from '@/lib/auth-context';
 import { useStore } from '@/lib/store-context';
 import { allFoods } from '@/lib/food-database';
 import { saveOrShareFile, textToBase64 } from '@/lib/file-export';
@@ -48,7 +46,6 @@ const dayLabels: Record<string, string> = {
 };
 
 export default function ExportReportsPage() {
-  const { user } = useAuth();
   const { profile, meals, exercises: exerciseLogs, bodyMetrics, calculations, workoutPlan, habits, sleepLogs } = useStore();
   const [timePeriod, setTimePeriod] = useState('Last 30 Days');
   const [showDropdown, setShowDropdown] = useState(false);
@@ -177,7 +174,7 @@ export default function ExportReportsPage() {
     // Client info on right
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text(`Client: ${user?.username || 'N/A'}`, pageWidth - 20, 22, { align: 'right' });
+    doc.text(`Client: ${profile?.name || 'N/A'}`, pageWidth - 20, 22, { align: 'right' });
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.text(`Period: ${timePeriod}`, pageWidth - 20, 30, { align: 'right' });
@@ -503,7 +500,7 @@ export default function ExportReportsPage() {
     doc.text('Confidential - For personal use only', pageWidth / 2, footerY, { align: 'center' });
     doc.text('Page 1 of 1', pageWidth - 15, footerY, { align: 'right' });
 
-    const filename = `gym-at-home-plan-${user?.username || 'user'}-${new Date().toISOString().split('T')[0]}.pdf`;
+    const filename = `gym-at-home-plan-${profile?.name || 'user'}-${new Date().toISOString().split('T')[0]}.pdf`;
     const dataUri = doc.output('datauristring');
     await saveOrShareFile(filename, 'application/pdf', dataUri.substring(dataUri.indexOf(',') + 1));
   };
@@ -513,7 +510,7 @@ export default function ExportReportsPage() {
     const toRow = (arr: string[]) => arr.map(escape).join(',');
     const rows: string[] = [];
     rows.push(toRow(['Gym at Home - Clinical Grade Plan']));
-    rows.push(toRow(['Client', user?.username || 'N/A', '', '', '']));
+    rows.push(toRow(['Client', profile?.name || 'N/A', '', '', '']));
     rows.push(toRow(['Generated', new Date().toLocaleDateString(), '', '', '']));
     rows.push(toRow(['Period', timePeriod, '', '', '']));
     rows.push(toRow(['', '', '', '', '']));
@@ -578,7 +575,7 @@ export default function ExportReportsPage() {
     }
 
     const csv = rows.join('\n');
-    const filename = `gym-at-home-plan-${user?.username || 'user'}-${new Date().toISOString().split('T')[0]}.csv`;
+    const filename = `gym-at-home-plan-${profile?.name || 'user'}-${new Date().toISOString().split('T')[0]}.csv`;
     await saveOrShareFile(filename, 'text/csv', textToBase64(csv));
   };
 
@@ -655,7 +652,7 @@ export default function ExportReportsPage() {
                       <User className="w-3.5 h-3.5 text-[#006C49]" />
                       <div>
                         <p className="text-gray-400 uppercase tracking-wider text-[9px]">Client</p>
-                        <p className="font-semibold text-gray-800">{user?.username || 'N/A'}</p>
+                        <p className="font-semibold text-gray-800">{profile?.name || 'N/A'}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1085,9 +1082,9 @@ export default function ExportReportsPage() {
                     {generating ? (
                       <span className="w-5 h-5 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
                     ) : (
-                      <Download className="w-5 h-5" />
+                      <Share2 className="w-5 h-5" />
                     )}
-                    {generating ? 'Generating...' : 'Download Now'}
+                    {generating ? 'Generating...' : 'Download / Share'}
                   </button>
                   <p className="text-center text-xs text-on-surface-variant mt-3">
                     {!profileComplete
@@ -1100,11 +1097,6 @@ export default function ExportReportsPage() {
                     <p className="text-center text-xs text-error mt-2">{exportError}</p>
                   )}
                 </div>
-
-                <button className="w-full border border-outline text-on-surface hover:bg-surface-container text-label-md py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-all active:scale-95">
-                  <Mail className="w-5 h-5" />
-                  Email to Clinician
-                </button>
               </div>
             </div>
           </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Calculator,
@@ -13,12 +13,10 @@ import {
   User,
   ChevronLeft,
   ChevronRight,
-  LogOut,
   MessageSquareWarning,
-  Terminal,
   ShieldCheck,
 } from 'lucide-react';
-import { useAuth } from '@/lib/auth-context';
+import { useStore } from '@/lib/store-context';
 import { useSidebar } from '@/lib/sidebar-context';
 import { useBackHandler } from '@/lib/back-handler';
 
@@ -37,21 +35,10 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const { user, logout } = useAuth();
+  const { profile } = useStore();
   const { collapsed, mobileOpen, toggle, setMobileOpen } = useSidebar();
 
   useBackHandler(mobileOpen, () => setMobileOpen(false));
-
-  const isAdmin = user?.role === 'admin';
-  const allNavItems = isAdmin
-    ? [...navItems, { href: '/dev-console', label: 'Dev Console', icon: Terminal }]
-    : navItems;
-
-  const handleLogout = () => {
-    logout();
-    router.push('/login');
-  };
 
   const handleNavClick = () => {
     setMobileOpen(false);
@@ -86,7 +73,7 @@ export default function Sidebar() {
 
         {/* Navigation */}
         <nav className="p-3 space-y-1">
-          {allNavItems.map((item) => {
+          {navItems.map((item) => {
             const isActive = pathname === item.href;
             return (
               <Link
@@ -109,26 +96,16 @@ export default function Sidebar() {
 
         {/* User Section */}
         <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-outline-variant/30">
-          {!collapsed && user && (
-            <div className="flex items-center gap-2 mb-2 px-3 py-2">
+          {!collapsed && (
+            <div className="flex items-center gap-2 px-3 py-2">
               <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                 <span className="text-sm font-medium text-primary">
-                  {user.username.charAt(0).toUpperCase()}
+                  {(profile?.name || 'U').charAt(0).toUpperCase()}
                 </span>
               </div>
-              <span className="text-sm text-on-surface truncate">{user.username}</span>
+              <span className="text-sm text-on-surface truncate">{profile?.name || 'User'}</span>
             </div>
           )}
-          <button
-            onClick={handleLogout}
-            className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-on-surface-variant hover:bg-error/10 hover:text-error transition-all ${
-              collapsed ? 'justify-center' : ''
-            }`}
-            title={collapsed ? 'Sign Out' : undefined}
-          >
-            <LogOut className="w-5 h-5 flex-shrink-0" />
-            {!collapsed && <span className="text-sm">Sign Out</span>}
-          </button>
         </div>
 
         {/* Collapse Toggle - Right Edge (desktop only) */}
