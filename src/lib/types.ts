@@ -284,4 +284,6 @@ export interface Badge {
   icon: string; // emoji
   unlockedAt: string | null;
   condition: string; // internal key
+  /** Leveled badges (streak) upgrade in place — index into STREAK_TIERS. */
+  level?: number;
 }

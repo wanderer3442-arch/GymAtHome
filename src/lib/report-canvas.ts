@@ -3,6 +3,8 @@
  * Everything is drawn in A4 points on a 2.5× bitmap, so the PDF stays sharp.
  */
 
+import type { ReportHeat } from './report-model';
+
 export const PW = 595.28; // A4 width, pt
 export const PH = 841.89; // A4 height, pt
 export const SCALE = 2.5; // ≈187 dpi
@@ -470,6 +472,47 @@ export function heatmap(
   text(ctx, 'M', x - 9, y + size * 0.75, 6, 600, C.faint, 'right');
   text(ctx, 'W', x - 9, y + step * 2 + size * 0.75, 6, 600, C.faint, 'right');
   text(ctx, 'F', x - 9, y + step * 4 + size * 0.75, 6, 600, C.faint, 'right');
+}
+
+/**
+ * Calendar-month habit heatmap: 7 columns (Mon→Sun), day numbers inside each
+ * cell. This is what the PDF prints — only the current month, never 12 weeks.
+ */
+export function monthCalendar(
+  ctx: Ctx,
+  x: number,
+  y: number,
+  heat: ReportHeat,
+  cell = 34,
+  gap = 4
+) {
+  const step = cell + gap;
+  const labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  labels.forEach((label, i) => {
+    text(ctx, label, x + i * step + cell / 2, y + 6, 6, 700, C.faint, 'center');
+  });
+  const top = y + 14;
+  heat.weeks.forEach((week, wi) => {
+    week.forEach((day, di) => {
+      if (!day) return;
+      const cx = x + di * step;
+      const cy = top + wi * step;
+      const color = day.future
+        ? '#f3f7f5'
+        : day.value <= 0
+          ? HEAT[0]
+          : day.value < 0.34
+            ? HEAT[1]
+            : day.value < 0.67
+              ? HEAT[2]
+              : day.value < 1
+                ? HEAT[3]
+                : HEAT[4];
+      fillRR(ctx, cx, cy, cell, cell, 5, color);
+      const ink = day.future ? '#c3d2cc' : day.value >= 0.67 ? '#ffffff' : C.body;
+      text(ctx, String(day.day), cx + cell / 2, cy + cell / 2 + 2.6, 7.2, 700, ink, 'center');
+    });
+  });
 }
 
 export function legendSwatches(ctx: Ctx, x: number, y: number, size = 9) {

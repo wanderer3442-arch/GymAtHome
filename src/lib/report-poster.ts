@@ -21,7 +21,7 @@ import {
   font,
   footer,
   hGrad,
-  heatmap,
+  monthCalendar,
   legendSwatches,
   num,
   pill,
@@ -561,15 +561,19 @@ function bodyPages(m: ReportModel): Sheet[] {
     flow.y += h + 12;
   }
 
-  // heatmap
+  // heatmap — current month only, with day numbers
   if (m.sections.habits) {
-    const h = 146;
+    const cell = 30;
+    const gap = 4;
+    const rows = m.heat.weeks.length;
+    const calH = 14 + rows * cell + Math.max(0, rows - 1) * gap;
+    const h = 40 + calH + 20;
     flow.ensure(h);
     card(flow.ctx, M, flow.y, CW, h, 16);
-    text(flow.ctx, 'Consistency · last 12 weeks', M + 16, flow.y + 24, 10, 700, C.ink);
+    text(flow.ctx, `Consistency · ${m.heat.label}`, M + 16, flow.y + 24, 10, 700, C.ink);
     text(
       flow.ctx,
-      `${m.habits.length} habit${m.habits.length === 1 ? '' : 's'} · ${m.heatDays} days`,
+      `${m.habits.length} habit${m.habits.length === 1 ? '' : 's'} · ${m.heat.activeDays}/${m.heat.days} days active`,
       PW - M - 16,
       flow.y + 24,
       7.4,
@@ -578,13 +582,13 @@ function bodyPages(m: ReportModel): Sheet[] {
       'right'
     );
     if (m.habits.length) {
-      heatmap(flow.ctx, M + 30, flow.y + 40, m.heat, 12.5, 3);
-      const legendX = PW - M - 148;
-      legendSwatches(flow.ctx, legendX, flow.y + 44, 9);
-      text(flow.ctx, 'Every square is a day', legendX, flow.y + 72, 6.6, 500, C.faint);
-      text(flow.ctx, `${m.bestStreak}-day best streak`, legendX, flow.y + 88, 9, 700, C.brand);
-      text(flow.ctx, 'Mon → Sun each column', legendX, flow.y + 104, 6.6, 500, C.faint);
-      text(flow.ctx, 'Darker means more habits done', legendX, flow.y + 118, 6.6, 500, C.faint);
+      monthCalendar(flow.ctx, M + 16, flow.y + 36, m.heat, cell, gap);
+      const legendX = PW - M - 160;
+      legendSwatches(flow.ctx, legendX, flow.y + 48, 9);
+      text(flow.ctx, 'Day numbers = calendar days', legendX, flow.y + 76, 6.6, 500, C.faint);
+      text(flow.ctx, `${m.bestStreak}-day best streak`, legendX, flow.y + 94, 9, 700, C.brand);
+      text(flow.ctx, 'Darker means more habits done', legendX, flow.y + 112, 6.6, 500, C.faint);
+      text(flow.ctx, 'Only this month is shown', legendX, flow.y + 126, 6.6, 500, C.faint);
     } else {
       text(flow.ctx, 'No habits tracked yet.', M + 16, flow.y + 80, 8.6, 500, C.faint);
     }

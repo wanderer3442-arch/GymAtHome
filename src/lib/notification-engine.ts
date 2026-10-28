@@ -8,6 +8,7 @@ import { useStreakInfo, DEFAULT_HYDRATION_L } from '@/lib/use-streak';
 import { showToast } from '@/components/ui/ToastNotification';
 import { peekCachedTemperature } from '@/lib/weather';
 import type { MealEntry } from '@/lib/types';
+import { localDateKey } from '@/lib/date';
 
 // ─── Zomato-style notification timing engine ─────────────────────────────
 // Moment-based triggers (not arbitrary schedules): each rule only produces a
@@ -157,9 +158,9 @@ function inWindow(h: number, start: number, end: number): boolean {
   return h >= start && h < end;
 }
 
-/** Same date-key convention as the store (UTC ISO date part). */
+/** Same local date-key convention as the store. */
 function dateKeyOf(now: Date): string {
-  return now.toISOString().split('T')[0];
+  return localDateKey(now);
 }
 
 /**
@@ -416,7 +417,7 @@ export function selectNotification(
 function dateKeyMinusDays(dateKey: string, days: number): string {
   const d = new Date(`${dateKey}T12:00:00`);
   d.setDate(d.getDate() - days);
-  return d.toISOString().split('T')[0];
+  return localDateKey(d);
 }
 
 /**

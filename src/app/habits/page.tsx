@@ -4,6 +4,9 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { Plus, Check, Clock, Trash2, ListTodo, Sparkles } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useStore } from '@/lib/store-context';
+import Heatmap from '@/components/Heatmap';
+import { buildHeatDays, type HeatKind, type HeatRange } from '@/lib/heatmap';
+import { localDateKey } from '@/lib/date';
 
 // ─── To-Do persistence (standalone localStorage, same privacy model) ───────
 interface Todo {
@@ -42,16 +45,16 @@ function habitStreak(dates: string[]): number {
   if (dates.length === 0) return 0;
   const set = new Set(dates);
   const d = new Date();
-  let key = d.toISOString().split('T')[0];
+  let key = localDateKey(d);
   if (!set.has(key)) {
     d.setDate(d.getDate() - 1);
-    key = d.toISOString().split('T')[0];
+    key = localDateKey(d);
   }
   let count = 0;
   while (set.has(key)) {
     count++;
     d.setDate(d.getDate() - 1);
-    key = d.toISOString().split('T')[0];
+    key = localDateKey(d);
   }
   return count;
 }
@@ -109,7 +112,7 @@ export default function HabitsPage() {
   const openTodos = todos.filter(t => !t.done);
   const finishedTodos = todos.filter(t => t.done);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateKey();
 
   const todayHabits = useMemo(() => {
     return habits.map((h) => ({
@@ -121,75 +124,21 @@ export default function HabitsPage() {
   const completedHabits = todayHabits.filter((h) => h.completed).length;
   const totalHabits = todayHabits.length;
 
-  // ─── Consistency heatmap (Monday-aligned, last 20 weeks) ──────────────────
-  const HEATMAP_WEEKS = 20;
-  const CELL = 16;
-  const COL = 22; // cell + gap
-  const heatmapScrollRef = useRef<HTMLDivElement>(null);
+  // ─── Consistency heatmap (range + calendar/grid selectable) ──────────────
+  const [heatRange, setHeatRange] = useState<HeatRange>('month');
+  const [heatKind, setHeatKind] = useState<HeatKind>('calendar');
 
-  const heatmap = useMemo(() => {
-    const now = new Date();
-    const todayKey = now.toISOString().split('T')[0];
-
-    // Anchor on Monday of this week. Noon keeps the calendar date stable when
-    // it is converted to a UTC date key.
-    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
-    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-
+  const habitHeat = useMemo(() => {
     const counts: Record<string, number> = {};
     habits.forEach((h) => {
       h.completedDates.forEach((d) => {
         counts[d] = (counts[d] || 0) + 1;
       });
     });
-
-    type Cell = { dateStr: string; count: number; isToday: boolean; future: boolean };
-    const weeks: Cell[][] = [];
-    const monthLabels: { week: number; label: string }[] = [];
-    let lastMonth = -1;
-
-    for (let w = 0; w < HEATMAP_WEEKS; w++) {
-      const week: Cell[] = [];
-      for (let day = 0; day < 7; day++) {
-        const cur = new Date(monday);
-        cur.setDate(monday.getDate() + (w - (HEATMAP_WEEKS - 1)) * 7 + day);
-        const dateStr = cur.toISOString().split('T')[0];
-        week.push({
-          dateStr,
-          count: counts[dateStr] || 0,
-          isToday: dateStr === todayKey,
-          future: dateStr > todayKey,
-        });
-      }
-      const firstOfWeek = new Date(monday);
-      firstOfWeek.setDate(monday.getDate() + (w - (HEATMAP_WEEKS - 1)) * 7);
-      const month = firstOfWeek.getMonth();
-      if (month !== lastMonth) {
-        monthLabels.push({
-          week: w,
-          label: firstOfWeek.toLocaleDateString('en', { month: 'short' }),
-        });
-        lastMonth = month;
-      }
-      weeks.push(week);
-    }
-
-    return { weeks, monthLabels, total: habits.length, todayKey };
-  }, [habits]);
-
-  // Newest weeks matter most — start scrolled to the right of the strip.
-  useEffect(() => {
-    const el = heatmapScrollRef.current;
-    if (el) el.scrollLeft = el.scrollWidth;
-  }, [habits.length]);
-
-  const getBg = (count: number) => {
-    const ratio = heatmap.total > 0 ? count / heatmap.total : 0;
-    if (ratio <= 0.25) return 'bg-primary/20';
-    if (ratio <= 0.5) return 'bg-primary/50';
-    if (ratio <= 0.75) return 'bg-primary/80';
-    return 'bg-primary';
-  };
+    return buildHeatDays(heatRange, (key) =>
+      habits.length > 0 ? (counts[key] || 0) / habits.length : 0
+    );
+  }, [habits, heatRange]);
 
   const addNewHabit = () => {
     if (!newHabitName.trim()) return;
@@ -443,19 +392,10 @@ export default function HabitsPage() {
           </div>
         </div>
 
-        {/* Habit Consistency - LeetCode Calendar */}
+        {/* Habit Consistency — calendar or grid, any range */}
         <div className="lg:col-span-3 bg-surface rounded-xl border border-outline-variant p-5 md:p-6">
-          <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="text-headline-md font-semibold text-on-surface">Habit Consistency</h2>
-            <div className="flex items-center gap-1.5 text-[10px] text-on-surface-variant">
-              <span>Less</span>
-              <div className="w-3 h-3 rounded bg-surface-container-high" />
-              <div className="w-3 h-3 rounded bg-primary/20" />
-              <div className="w-3 h-3 rounded bg-primary/50" />
-              <div className="w-3 h-3 rounded bg-primary/80" />
-              <div className="w-3 h-3 rounded bg-primary" />
-              <span>More</span>
-            </div>
           </div>
           {habits.length === 0 ? (
             <p className="text-sm text-on-surface-variant text-center py-10 italic">
@@ -463,72 +403,21 @@ export default function HabitsPage() {
             </p>
           ) : (
             <div>
-              {/* Calendar Grid */}
-              <div ref={heatmapScrollRef} className="overflow-x-auto no-scrollbar pb-2">
-                <div className="min-w-max">
-                  {/* Month labels — absolutely placed so they line up with columns */}
-                  <div
-                    className="relative h-4 mb-1"
-                    style={{ marginLeft: 42, width: HEATMAP_WEEKS * COL }}
-                  >
-                    {heatmap.monthLabels.map((ml) => (
-                      <span
-                        key={`${ml.label}-${ml.week}`}
-                        className="absolute text-[10px] text-on-surface-variant font-medium"
-                        style={{ left: ml.week * COL }}
-                      >
-                        {ml.label}
-                      </span>
-                    ))}
-                  </div>
-
-                  {/* Grid row: day labels + cells */}
-                  <div className="flex gap-[6px]">
-                    <div className="flex flex-col gap-[6px] mr-1.5">
-                      {['Mon', '', 'Wed', '', 'Fri', '', ''].map((day, i) => (
-                        <div
-                          key={i}
-                          className="text-[10px] text-on-surface-variant flex items-center font-medium"
-                          style={{ height: CELL }}
-                        >
-                          {day}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex gap-[6px]">
-                      {heatmap.weeks.map((week, wi) => (
-                        <div key={wi} className="flex flex-col gap-[6px]">
-                          {week.map((day) => (
-                            <div
-                              key={day.dateStr}
-                              className={`rounded-[3px] transition-colors ${
-                                day.future
-                                  ? 'bg-transparent'
-                                  : day.count === 0
-                                    ? 'bg-surface-container-high'
-                                    : getBg(day.count)
-                              } ${day.isToday ? 'ring-1 ring-primary' : ''}`}
-                              style={{ width: CELL, height: CELL }}
-                              title={
-                                day.future
-                                  ? undefined
-                                  : `${day.dateStr}: ${day.count}/${heatmap.total} habits`
-                              }
-                            />
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <Heatmap
+                days={habitHeat}
+                range={heatRange}
+                onRangeChange={setHeatRange}
+                kind={heatKind}
+                onKindChange={setHeatKind}
+                unit="days"
+              />
 
               {/* Habit Stats */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-5 pt-4 border-t border-outline-variant/30">
                 {habits.map((h) => {
                   const streak = habitStreak(h.completedDates);
-                  const monthPrefix = heatmap.todayKey.slice(0, 7);
-                  const elapsed = Math.max(Number(heatmap.todayKey.slice(8, 10)), 1);
+                  const monthPrefix = today.slice(0, 7);
+                  const elapsed = Math.max(Number(today.slice(8, 10)), 1);
                   const completedThisMonth = h.completedDates.filter((d) =>
                     d.startsWith(monthPrefix)
                   ).length;

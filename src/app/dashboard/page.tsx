@@ -17,9 +17,12 @@ import {
 import Link from 'next/link';
 import { useStore } from '@/lib/store-context';
 import { allFoods } from '@/lib/food-database';
-import { BADGE_CATALOG } from '@/lib/badges';
+import { BADGE_CATALOG, STREAK_BADGE_ID, STREAK_TIERS } from '@/lib/badges';
 import { FoodItem } from '@/lib/types';
 import { WeatherWidget } from '@/lib/weather';
+import Heatmap from '@/components/Heatmap';
+import { buildHeatDays, type HeatKind, type HeatRange } from '@/lib/heatmap';
+import { localDateKey, streakEndingToday } from '@/lib/date';
 
 const healthTips = [
   "8 hours of sleep is vital for muscle recovery and hormonal balance.",
@@ -29,14 +32,6 @@ const healthTips = [
   "Consistency beats intensity - small daily habits drive results.",
   "Getting sunlight in the morning regulates your circadian rhythm.",
 ];
-
-const monthCellColor = (score: number) => {
-  if (score < 0) return 'bg-transparent';
-  if (score === 0) return 'bg-surface-container-high';
-  if (score < 50) return 'bg-primary/30';
-  if (score < 90) return 'bg-primary/70';
-  return 'bg-primary';
-};
 
 export default function DashboardPage() {
   const {
@@ -48,6 +43,8 @@ export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const [foodSearch, setFoodSearch] = useState('');
   const [searchResults, setSearchResults] = useState<FoodItem[]>([]);
+  const [heatRange, setHeatRange] = useState<HeatRange>('month');
+  const [heatKind, setHeatKind] = useState<HeatKind>('calendar');
   const [goals, setGoals] = useState([
     { id: 1, label: 'Log Meals', completed: false, pct: 0 },
     { id: 2, label: 'Daily Habit: Hydration', completed: false, pct: 0 },
@@ -64,7 +61,7 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateKey();
   const todayMeals = useMemo(() => getMealsForDate(today), [meals, today]);
   const todayWaterMl = useMemo(() => getWaterForDate(today), [waterLogs, today]);
   const hydrationTarget = calculations?.hydration || 0;
@@ -107,50 +104,31 @@ export default function DashboardPage() {
     }));
   }, [todayMeals, exercises, waterLogs, hydrationTarget, today]);
 
-  const streak = useMemo(() => {
-    let count = 0;
-    const d = new Date();
-    for (let i = 0; i < 30; i++) {
-      const dateStr = d.toISOString().split('T')[0];
-      if (getMealsForDate(dateStr).length > 0 || getExercisesForDate(dateStr).length > 0) {
-        count++;
-      } else if (i > 0) {
-        break;
-      }
-      d.setDate(d.getDate() - 1);
-    }
-    return count;
-  }, [meals, exercises]);
+  const streak = useMemo(
+    () =>
+      streakEndingToday(
+        (key) => getMealsForDate(key).length > 0 || getExercisesForDate(key).length > 0
+      ),
+    [meals, exercises]
+  );
 
-  // GitHub-style month grid from real daily activity (last 5 weeks, Monday-aligned)
-  const monthWeeks = useMemo(() => {
-    const end = new Date();
-    const start = new Date(end);
-    start.setDate(end.getDate() - 34);
-    const dow = (start.getDay() + 6) % 7;
-    start.setDate(start.getDate() - dow);
-    const cells: { dateStr: string; score: number; isToday: boolean; empty: boolean }[] = [];
-    const cur = new Date(start);
-    while (cur <= end) {
-      const dateStr = cur.toISOString().split('T')[0];
-      const dayMeals = getMealsForDate(dateStr);
-      const dayExercises = getExercisesForDate(dateStr);
-      let score = 0;
-      if (dayMeals.length > 0) score += 40;
-      if (dayExercises.length > 0) score += 40;
-      if (dayMeals.length > 2) score += 20;
-      cells.push({ dateStr, score: Math.min(score, 100), isToday: dateStr === today, empty: false });
-      cur.setDate(cur.getDate() + 1);
-    }
-    while (cells.length % 7 !== 0) {
-      cells.push({ dateStr: '', score: -1, isToday: false, empty: true });
-    }
-    const weeks: typeof cells[] = [];
-    for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
-    return weeks;
-  }, [meals, exercises, today]);
+  // Heatmap data for the selected range. A full day = meals + workout.
+  const activityHeat = useMemo(() => {
+    const scoreFor = (key: string) => {
+      const hasMeal = getMealsForDate(key).length > 0;
+      const hasWorkout = getExercisesForDate(key).length > 0;
+      if (hasMeal && hasWorkout) return 1;
+      if (hasWorkout) return 0.7;
+      if (hasMeal) return 0.4;
+      return 0;
+    };
+    return buildHeatDays(heatRange, scoreFor);
+  }, [heatRange, meals, exercises]);
 
-  const activeDays = monthWeeks.flat().filter((c) => !c.empty && c.score > 0).length;
+  const streakBadge = badges.find((b) => b.id === STREAK_BADGE_ID);
+  const streakLevel = streakBadge ? streakBadge.level ?? 0 : -1;
+  const nextStreakTier =
+    streakLevel + 1 < STREAK_TIERS.length ? STREAK_TIERS[streakLevel + 1] : null;
 
   // All-time best weight per exercise (Personal Records)
   const personalRecords = useMemo(() => {
@@ -336,7 +314,7 @@ export default function DashboardPage() {
 
         {/* Consistency heatmap */}
         <section className="bg-surface rounded-xl border border-outline-variant shadow-[0_4px_15px_4px_rgba(15,23,42,0.04)] p-5 flex flex-col">
-          <div className="flex flex-wrap justify-between items-start gap-3 mb-5">
+          <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
             <div>
               <h2 className="text-headline-md font-semibold text-on-background">Consistency</h2>
               <p className="text-label-md text-on-surface-variant mt-1">
@@ -348,52 +326,14 @@ export default function DashboardPage() {
               <span className="text-label-md font-bold text-primary">{streak} Day Streak</span>
             </div>
           </div>
-          {/* Month header + grid */}
-          <div className="flex gap-2">
-            {/* Weekday labels */}
-            <div className="flex flex-col gap-1.5">
-              <div className="h-4 mb-1" />
-              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => (
-                <span key={i} className="h-6 md:h-7 flex items-center text-[10px] text-on-surface-variant leading-none">{d}</span>
-              ))}
-            </div>
-            {/* Week columns with month labels above */}
-            <div className="flex gap-1.5">
-              {monthWeeks.map((week, wi) => {
-                const month = new Date(week[0].dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' });
-                const prevMonth = wi > 0 ? new Date(monthWeeks[wi - 1][0].dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' }) : null;
-                return (
-                  <div key={wi} className="flex flex-col items-center">
-                    <span className="h-4 text-[10px] font-semibold text-on-surface-variant leading-none">
-                      {month !== prevMonth ? month : ''}
-                    </span>
-                    <div className="flex flex-col gap-1.5 mt-1">
-                      {week.map((cell, ci) => (
-                        <div
-                          key={ci}
-                          title={cell.empty ? undefined : `${new Date(cell.dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — ${cell.score === 0 ? 'No activity' : cell.score < 50 ? 'Meals logged' : cell.score < 90 ? 'Meals + workout' : 'Full day'}`}
-                          className={`w-6 h-6 md:w-7 md:h-7 rounded-[6px] transition-colors ${monthCellColor(cell.score)}${cell.isToday ? ' ring-2 ring-primary ring-offset-2 ring-offset-surface' : ''}`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          {/* Summary + legend */}
-          <div className="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t border-outline-variant/60">
-            <span className="text-label-md text-on-surface-variant">
-              <span className="font-bold text-on-surface">{activeDays}</span> of the last 35 days active
-            </span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-on-surface-variant">Less</span>
-              {[0, 25, 60, 100].map((s) => (
-                <div key={s} className={`w-3 h-3 rounded-[3px] ${monthCellColor(s)}`} />
-              ))}
-              <span className="text-[10px] text-on-surface-variant">More</span>
-            </div>
-          </div>
+          <Heatmap
+            days={activityHeat}
+            range={heatRange}
+            onRangeChange={setHeatRange}
+            kind={heatKind}
+            onKindChange={setHeatKind}
+            unit="days"
+          />
         </section>
 
         {/* Log Food - compact single row */}
@@ -493,8 +433,46 @@ export default function DashboardPage() {
                 {badges.length} / {BADGE_CATALOG.length}
               </span>
             </div>
+
+            {/* Leveled consistency badge — upgrades in place as the streak grows */}
+            <div className="mb-3 rounded-xl border border-primary/20 bg-primary/5 p-3">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl leading-none shrink-0">
+                  {streakBadge?.icon ?? STREAK_TIERS[0].icon}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-label-md font-bold text-on-surface truncate">
+                    {streakBadge?.name ?? 'Consistency Badge'}
+                  </p>
+                  <p className="text-[10px] text-on-surface-variant">
+                    {streakBadge
+                      ? `${streak}-day streak · level ${streakLevel + 1} of ${STREAK_TIERS.length}`
+                      : 'Log meals or workouts 3 days in a row to unlock'}
+                    {streakBadge && nextStreakTier
+                      ? ` · ${Math.max(0, nextStreakTier.days - streak)} days to ${nextStreakTier.name}`
+                      : ''}
+                  </p>
+                </div>
+                {streakBadge && (
+                  <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary">
+                    Lv {streakLevel + 1}
+                  </span>
+                )}
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-container-high">
+                <div
+                  className="h-full rounded-full bg-primary transition-all"
+                  style={{
+                    width: nextStreakTier
+                      ? `${Math.min(100, Math.round((streak / nextStreakTier.days) * 100))}%`
+                      : '100%',
+                  }}
+                />
+              </div>
+            </div>
+
             <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
-              {BADGE_CATALOG.map((b) => {
+              {BADGE_CATALOG.filter((b) => b.id !== STREAK_BADGE_ID).map((b) => {
                 const unlocked = badges.some((x) => x.id === b.id);
                 return (
                   <div

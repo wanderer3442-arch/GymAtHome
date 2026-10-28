@@ -55,8 +55,8 @@ const sections = [
   },
   {
     icon: Sparkles,
-    title: 'AI features (Google Gemini)',
-    body: 'When you chat with the AI assistant and request a plan, the text you type (plus your profile numbers you have filled in) is sent through our proxy to Google Gemini to generate a reply. That prompt may include health details you type. We do not store these conversations, and Google processes the request to generate the response.',
+    title: 'AI features (Groq)',
+    body: 'When you chat with the AI assistant and request a plan, the text you type (plus your profile numbers you have filled in) is sent through our proxy to Groq to generate a reply. That prompt may include health details you type. We do not store these conversations, and Groq processes the request to generate the response.',
   },
   {
     icon: ShieldCheck,

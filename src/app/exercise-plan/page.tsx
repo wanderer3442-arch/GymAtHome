@@ -18,6 +18,7 @@ import {
   Check,
 } from 'lucide-react';
 import { useStore } from '@/lib/store-context';
+import { keyOfTimestamp, localDateKey } from '@/lib/date';
 import { exercises } from '@/lib/exercise-database';
 import {
   generateWorkoutPlan,
@@ -184,8 +185,8 @@ export default function ExercisePlanPage() {
       for (let j = 0; j < 7; j++) {
         const dd = new Date(weekStart);
         dd.setDate(weekStart.getDate() + j);
-        const dateStr = dd.toISOString().split('T')[0];
-        const dayExercises = loggedExercises.filter((e) => e.loggedAt.startsWith(dateStr));
+        const dateStr = localDateKey(dd);
+        const dayExercises = loggedExercises.filter((e) => keyOfTimestamp(e.loggedAt) === dateStr);
         count += dayExercises.length;
       }
       data.push({ week: weekStr, value: count, height: count === 0 ? 8 : `${Math.min(20 + count * 10, 100)}%` });
@@ -245,7 +246,7 @@ export default function ExercisePlanPage() {
     });
   };
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = localDateKey();
   const todayLogs = getExercisesForDate(todayStr);
 
   const startEdit = (key: string, val: number | undefined) => {

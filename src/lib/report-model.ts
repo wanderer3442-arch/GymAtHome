@@ -2,12 +2,13 @@
  * Gym at Home report model
  * ─────────────────────
  * Turns the raw store into the numbers the poster prints: targets, the last
- * seven calorie bars, the training split, weight history, and a 12-week habit
- * heatmap. Kept separate from the canvas drawing so the CSV export and the PDF
- * always agree.
+ * seven calorie bars, the training split, weight history, and the current
+ * month's habit calendar. Kept separate from the canvas drawing so the CSV
+ * export and the PDF always agree.
  */
 
 import { allFoods } from './food-database';
+import { dateFromKey, localDateKey } from './date';
 import type {
   BodyMetric,
   Calculations,
@@ -111,9 +112,8 @@ export interface ReportModel {
   planDays: ReportPlanDay[];
   metrics: ReportMetric[];
   habits: ReportHabit[];
-  /** 12 columns (weeks, Monday first) × 7 rows. `value` is 0..1, or -1 for future days. */
-  heat: { date: string; value: number }[][];
-  heatDays: number;
+  /** Current-month calendar heatmap (day numbers, Monday-first weeks). */
+  heat: ReportHeat;
   mealRows: ReportMealRow[];
   sections: ReportSections;
   includeMacros: boolean;
@@ -135,7 +135,26 @@ const DAY_FOCUS: Record<string, string> = {
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-const dateKey = (d: Date) => d.toISOString().split('T')[0];
+export interface ReportHeatCell {
+  date: string;
+  day: number;
+  /** 0..1 (share of habits completed). */
+  value: number;
+  future: boolean;
+}
+
+export interface ReportHeat {
+  year: number;
+  month: number;
+  label: string;
+  /** Monday-first weeks; `null` pads days outside the current month. */
+  weeks: (ReportHeatCell | null)[][];
+  /** Elapsed days in the month. */
+  days: number;
+  activeDays: number;
+}
+
+const dateKey = (d: Date) => localDateKey(d);
 
 const addDays = (d: Date, n: number) => {
   const x = new Date(d);
@@ -170,35 +189,48 @@ export function habitStreak(dates: string[]): number {
   return count;
 }
 
-function buildHeat(habits: Habit[]): { heat: ReportModel['heat']; days: number } {
-  const today = new Date();
-  const todayKey = dateKey(today);
-  const monday = addDays(today, -((today.getDay() + 6) % 7));
-  const start = addDays(monday, -11 * 7);
+function buildHeat(habits: Habit[]): ReportHeat {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1, 12);
+  const start = addDays(first, -((first.getDay() + 6) % 7));
   const sets = habits.map((h) => new Set(h.completedDates));
-  const heat: { date: string; value: number }[][] = [];
+  const todayKey = dateKey(now);
+  const weeks: (ReportHeatCell | null)[][] = [];
   let days = 0;
+  let activeDays = 0;
 
-  for (let w = 0; w < 12; w++) {
-    const col: { date: string; value: number }[] = [];
+  for (let w = 0; w < 6; w++) {
+    const week: (ReportHeatCell | null)[] = [];
     for (let d = 0; d < 7; d++) {
       const dt = addDays(start, w * 7 + d);
+      if (dt.getMonth() !== now.getMonth() || dt.getFullYear() !== now.getFullYear()) {
+        week.push(null);
+        continue;
+      }
       const key = dateKey(dt);
-      if (key > todayKey) {
-        col.push({ date: key, value: -1 });
-        continue;
-      }
-      days++;
-      if (!habits.length) {
-        col.push({ date: key, value: 0 });
-        continue;
-      }
-      const done = sets.reduce((n, s) => n + (s.has(key) ? 1 : 0), 0);
-      col.push({ date: key, value: done / habits.length });
+      const future = key > todayKey;
+      if (!future) days++;
+      const value =
+        future || habits.length === 0
+          ? 0
+          : sets.reduce((n, s) => n + (s.has(key) ? 1 : 0), 0) / habits.length;
+      if (value > 0) activeDays++;
+      week.push({ date: key, day: dt.getDate(), value, future });
     }
-    heat.push(col);
+    weeks.push(week);
   }
-  return { heat, days };
+  while (weeks.length > 0 && weeks[weeks.length - 1].every((cell) => cell === null)) {
+    weeks.pop();
+  }
+
+  return {
+    year: now.getFullYear(),
+    month: now.getMonth(),
+    label: now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+    weeks,
+    days,
+    activeDays,
+  };
 }
 
 export function buildReportModel(input: ReportInput): ReportModel {
@@ -301,7 +333,7 @@ export function buildReportModel(input: ReportInput): ReportModel {
   const monthDays = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
   const habitRows: ReportHabit[] = habits.map((h) => {
     const monthDone = h.completedDates.filter((d) => {
-      const dt = new Date(d);
+      const dt = dateFromKey(d);
       return dt.getMonth() === today.getMonth() && dt.getFullYear() === today.getFullYear();
     }).length;
     return {
@@ -314,7 +346,7 @@ export function buildReportModel(input: ReportInput): ReportModel {
     };
   });
 
-  const { heat, days: heatDays } = buildHeat(habits);
+  const heat = buildHeat(habits);
 
   const p = (calculations?.protein || 0) * 4;
   const c = (calculations?.carbs || 0) * 4;
@@ -398,7 +430,6 @@ export function buildReportModel(input: ReportInput): ReportModel {
     metrics,
     habits: habitRows,
     heat,
-    heatDays,
     mealRows,
     sections: input.sections,
     includeMacros: input.includeMacros,

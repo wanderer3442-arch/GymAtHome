@@ -18,7 +18,8 @@ import {
 } from './types';
 import { calculateAll } from './calculations';
 import { allFoods } from './food-database';
-import { BADGE_CATALOG } from './badges';
+import { BADGE_CATALOG, STREAK_BADGE_ID, STREAK_TIERS, streakTierIndex } from './badges';
+import { keyOfTimestamp, localDateKey, streakEndingToday } from './date';
 
 // Single-device store. Replaces the old per-account `gymathome_store_<id>` keys
 // left behind by the removed sign-in flow.
@@ -179,11 +180,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (parsed.sleepLogs) setSleepLogs(parsed.sleepLogs);
         if (parsed.badges) {
           const seenIds = new Set<string>();
-          setBadges(parsed.badges.filter((b: Badge) => {
-            if (seenIds.has(b.id)) return false;
-            seenIds.add(b.id);
-            return true;
-          }));
+          // `streak_7` was the old one-off badge; it becomes level 1 of the
+          // single leveled streak badge.
+          setBadges(
+            parsed.badges
+              .map((b: Badge) =>
+                b.id === 'streak_7' ? { ...b, id: STREAK_BADGE_ID, level: 1 } : b
+              )
+              .filter((b: Badge) => {
+                if (seenIds.has(b.id)) return false;
+                seenIds.add(b.id);
+                return true;
+              })
+          );
         }
         if (parsed.theme) setTheme(parsed.theme);
         if (parsed.isProfileSet) setIsProfileSet(parsed.isProfileSet);
@@ -247,7 +256,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   const getMealsForDate = (date: string) => {
-    return meals.filter(m => m.loggedAt.startsWith(date));
+    // Timestamps are UTC ISO strings; group by the user's local day.
+    return meals.filter((m) => keyOfTimestamp(m.loggedAt) === date);
   };
 
   const addExercise = (entry: ExerciseEntry) => {
@@ -263,7 +273,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   const getExercisesForDate = (date: string) => {
-    return exercises.filter(e => e.loggedAt.startsWith(date));
+    return exercises.filter((e) => keyOfTimestamp(e.loggedAt) === date);
   };
 
   const addHabit = (habit: Habit) => {
@@ -294,7 +304,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   const addWater = (amount: number) => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateKey();
     setWaterLogs(prev => [...prev, { date: today, amount, loggedAt: new Date().toISOString() }]);
     // Check for water badge
     checkBadges();
@@ -305,7 +315,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   const addSleep = (hours: number) => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateKey();
     setSleepLogs(prev => [...prev, { date: today, hours, loggedAt: new Date().toISOString() }]);
   };
 
@@ -327,7 +337,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [theme]);
 
   const checkBadges = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateKey();
     const newBadges: Badge[] = [];
 
     const hasBadge = (id: string) => badges.some(b => b.id === id);
@@ -341,25 +351,39 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    const streakStart = new Date(today);
-    const streakEnd = new Date(streakStart);
-    streakEnd.setDate(streakEnd.getDate() + 7);
-
-    // 7-day streak
-    if (!hasBadge('streak_7')) {
-      let streak = 0;
-      const d = new Date(today);
-      for (let i = 0; i < 30; i++) {
-        const dateStr = d.toISOString().split('T')[0];
-        if (getMealsForDate(dateStr).length > 0 || getExercisesForDate(dateStr).length > 0) {
-          streak++;
-        } else if (i > 0) {
-          break;
-        }
-        d.setDate(d.getDate() - 1);
-      }
-      if (streak >= 7) {
-        pushBadge('streak_7');
+    // Consistency badge: one badge that levels up with the streak, never a new
+    // badge for every milestone.
+    const streak = streakEndingToday(
+      (key) => getMealsForDate(key).length > 0 || getExercisesForDate(key).length > 0
+    );
+    const tier = streakTierIndex(streak);
+    if (tier >= 0) {
+      const existing = badges.find((b) => b.id === STREAK_BADGE_ID);
+      const currentLevel = existing?.level ?? -1;
+      if (tier > currentLevel) {
+        const def = STREAK_TIERS[tier];
+        const upgraded: Badge = {
+          id: STREAK_BADGE_ID,
+          name: def.name,
+          description: def.description,
+          icon: def.icon,
+          unlockedAt: today,
+          condition: 'streak',
+          level: tier,
+        };
+        setBadges((prev) => {
+          const has = prev.some((b) => b.id === STREAK_BADGE_ID);
+          return has
+            ? prev.map((b) => (b.id === STREAK_BADGE_ID ? upgraded : b))
+            : [...prev, upgraded];
+        });
+        showToast(
+          existing
+            ? `🔥 Streak badge upgraded: ${def.name}`
+            : `🏆 New Badge Unlocked: ${def.name}`,
+          'success',
+          5000
+        );
       }
     }
 
@@ -381,10 +405,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // 7-day water tracking
     if (!hasBadge('water_7')) {
       let waterDays = 0;
-      const d = new Date(today);
+      const d = new Date();
       for (let i = 0; i < 7; i++) {
-        const dateStr = d.toISOString().split('T')[0];
-        if (getWaterForDate(dateStr) > 0) waterDays++;
+        if (getWaterForDate(localDateKey(d)) > 0) waterDays++;
         d.setDate(d.getDate() - 1);
       }
       if (waterDays >= 7) {
@@ -395,10 +418,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // Hit protein target 5 days
     if (!hasBadge('protein_5') && calculations) {
       let proteinDays = 0;
-      const d = new Date(today);
+      const d = new Date();
       for (let i = 0; i < 30; i++) {
-        const dateStr = d.toISOString().split('T')[0];
-        const dayMeals = getMealsForDate(dateStr);
+        const dayMeals = getMealsForDate(localDateKey(d));
         let totalProtein = 0;
         dayMeals.forEach(m => {
           const food = allFoods.find((f: any) => f.id === m.foodId);
@@ -430,6 +452,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       });
     }
   };
+
+  // Re-evaluate badges once the persisted store is hydrated — the mount-time
+  // call runs before localStorage is read, so streaks would look empty. Also
+  // runs whenever new activity lands.
+  useEffect(() => {
+    if (!loaded) return;
+    checkBadges();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, meals.length, exercises.length, waterLogs.length]);
 
   return (
     <StoreContext.Provider

@@ -25,6 +25,7 @@ import {
 } from 'recharts';
 import { useStore } from '@/lib/store-context';
 import { sumMealNutrition } from '@/lib/calculations';
+import { localDateKey } from '@/lib/date';
 
 const habitCategories = [
   { id: 'water', name: 'Water Intake', icon: Droplets, color: '#0058be', unit: 'ml', target: 2500 },
@@ -68,7 +69,7 @@ export default function LoggerPage() {
   const [selectedHabit, setSelectedHabit] = useState('water');
   const [logValue, setLogValue] = useState('');
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateKey();
 
   const waterTargetMl = Math.round((calculations?.hydration || 2.5) * 1000);
   const calorieGoal = calculations?.targetCalories || 0;
@@ -80,7 +81,7 @@ export default function LoggerPage() {
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(now.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = localDateKey(d);
       const dayMeals = getMealsForDate(dateStr);
       const metric = bodyMetrics.find((m) => m.date === dateStr);
       const dayWater = waterLogs.filter(w => w.date === dateStr).reduce((sum, w) => sum + w.amount, 0);

@@ -14,6 +14,8 @@ import {
   ArrowUpRight,
   UtensilsCrossed,
   Dumbbell,
+  Paperclip,
+  FileSpreadsheet,
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { getChatResponse, hasGeminiKey } from '@/lib/ai-service';
@@ -23,6 +25,7 @@ import { PLAN_DAY_NAMES } from '@/lib/exercise-planner';
 import { useStore } from '@/lib/store-context';
 import { savePlanToPreferences, ParsedPlanDay } from '@/lib/meal-plan-import';
 import { mergeAiExercisePlan, AiExercisePlanDay } from '@/lib/exercise-plan-import';
+import { keyOfTimestamp, localDateKey } from '@/lib/date';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/ToastNotification';
 import { useBackHandler } from '@/lib/back-handler';
@@ -212,7 +215,7 @@ function defaultGreeting(name?: string | null): Message {
 }
 
 function todayKey(): string {
-  return new Date().toISOString().split('T')[0];
+  return localDateKey();
 }
 
 function loadDailyCount(): number {
@@ -486,6 +489,9 @@ export default function ChatBot({ mode = 'floating', onClose }: ChatBotProps) {
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const [dailyCount, setDailyCount] = useState(0);
+  const [attachment, setAttachment] = useState<{ name: string; rows: number; text: string } | null>(null);
+  const [csvError, setCsvError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const historyLoadedRef = useRef(false);
   // Last prompt text — the "Retry" chip re-sends it instead of sending the
@@ -527,8 +533,8 @@ export default function ChatBot({ mode = 'floating', onClose }: ChatBotProps) {
 
   // Build personalized context for AI (real data only)
   const chatContext = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
-    const todayMeals = meals.filter(m => m.loggedAt.startsWith(today));
+    const today = localDateKey();
+    const todayMeals = meals.filter(m => keyOfTimestamp(m.loggedAt) === today);
     const nutrition = sumMealNutrition(todayMeals);
     const todayExercises = workoutPlan?.exercises?.filter((e: any) => e.day === new Date().getDay()) || [];
     const todayWaterL = meals.length > 0 ? 2.0 : 0; // approximate
@@ -725,26 +731,89 @@ export default function ChatBot({ mode = 'floating', onClose }: ChatBotProps) {
     router.push(kind === 'exercise' ? '/exercise-plan' : '/meal-plan');
   };
 
+  // ── CSV plan import ───────────────────────────────────────────────────────
+  // The file is read on-device, trimmed, and sent to the agent as text. The
+  // agent turns it into the same JSON plan block the Save Plan card uses, so
+  // the user never retypes a single row.
+  const MAX_CSV_BYTES = 256 * 1024;
+  const MAX_CSV_CHARS = 12000;
+
+  const handleCsvFile = async (file: File) => {
+    setCsvError('');
+    if (!/\.(csv|txt)$/i.test(file.name)) {
+      setCsvError('Choose a .csv file (or a plain-text export).');
+      return;
+    }
+    if (file.size > MAX_CSV_BYTES) {
+      setCsvError('That file is too large — keep it under 256 KB.');
+      return;
+    }
+    let text = '';
+    try {
+      text = (await file.text()).trim();
+    } catch {
+      setCsvError('Could not read that file. Try exporting it again.');
+      return;
+    }
+    if (!text) {
+      setCsvError('That file is empty.');
+      return;
+    }
+    const rows = text.split(/\r?\n/).filter((line) => line.trim()).length;
+    if (rows < 2) {
+      setCsvError('Include a header row and at least one data row.');
+      return;
+    }
+    setAttachment({ name: file.name, rows: rows - 1, text: text.slice(0, MAX_CSV_CHARS) });
+  };
+
+  const csvPrompt = (file: { name: string; rows: number; text: string }, note: string) =>
+    [
+      `I've uploaded my existing plan as a CSV file: ${file.name} (${file.rows} data rows).`,
+      'Use the CSV as the source of truth. Work out whether it is a diet plan, an exercise plan, or both.',
+      'Convert every row into the plan JSON block described in your instructions (meal block, exercise block, or both) so the app shows a Save Plan card. Do not ask me to retype anything and do not invent rows that are not in the file.',
+      note ? `Extra note from me: ${note}` : '',
+      '',
+      'CSV:',
+      file.text,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
   const handleSend = async (text?: string) => {
     if (isTyping) return;
 
     let sendText = text || message.trim();
+    const csv = attachment;
+    const typedNote = sendText.trim();
+    if (!sendText && !csv) return;
+    const displayText = csv
+      ? `📄 ${csv.name} · ${csv.rows} rows${typedNote ? `\n${typedNote}` : ''}`
+      : sendText;
 
     // "Retry" chip → resend the previous prompt (a failed turn must not force
     // the user to retype anything).
-    if (sendText.trim().toLowerCase() === 'retry' && lastPromptRef.current) {
+    if (!csv && sendText.trim().toLowerCase() === 'retry' && lastPromptRef.current) {
       sendText = lastPromptRef.current;
-    } else if (
-      sendText &&
+    }
+
+    // A CSV attachment always goes to the agent, even with no typed message.
+    if (csv) {
+      sendText = csvPrompt(csv, typedNote);
+    }
+    if (!sendText) return;
+
+    // Remember the full prompt (including any CSV payload) so Retry re-sends
+    // exactly the same turn.
+    if (
       !/^(save plan|save to meal plan|add to meal plan|open meal plan|save to exercise plan|save workout plan|open exercise plan)$/i.test(sendText.trim())
     ) {
       lastPromptRef.current = sendText;
     }
-    if (!sendText) return;
 
     // "Save plan" / "Open Meal Plan" are local actions: no AI call, no daily
     // limit cost. Saving copies the parsed plan straight into the Meal Plan page.
-    const localAction = sendText.trim().toLowerCase();
+    const localAction = csv ? '' : sendText.trim().toLowerCase();
     const timestampNow = stamp();
 
     if (localAction === 'open meal plan') {
@@ -798,12 +867,13 @@ export default function ChatBot({ mode = 'floating', onClose }: ChatBotProps) {
     const userMessage: Message = {
       id: messages.length + 1,
       role: 'user',
-      content: sendText,
+      content: displayText,
       timestamp,
     };
 
     setMessages(prev => [...prev, userMessage]);
     setMessage('');
+    if (csv) setAttachment(null);
     setIsTyping(true);
 
     // Count against the daily limit (persisted per day)
@@ -1030,7 +1100,7 @@ export default function ChatBot({ mode = 'floating', onClose }: ChatBotProps) {
           <h1 className={ui.headTitle}>V</h1>
           <p className={ui.headSub}>
             <span className={ui.dot} data-online={online} />
-            {online ? 'Gemini AI' : 'Offline'} · {dailyCount}/{FREE_DAILY_LIMIT} today
+            {online ? 'AI Coach' : 'Offline'} · {dailyCount}/{FREE_DAILY_LIMIT} today
           </p>
         </div>
         <div className={ui.headActions}>
@@ -1152,7 +1222,51 @@ export default function ChatBot({ mode = 'floating', onClose }: ChatBotProps) {
             </div>
           </div>
 
+          {attachment && (
+            <div className="mb-2 flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2">
+              <FileSpreadsheet size={16} className="shrink-0 text-primary" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[11px] font-semibold text-on-surface">{attachment.name}</p>
+                <p className="text-[10px] text-on-surface-variant">
+                  {attachment.rows} rows · V will turn this into a saveable plan
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAttachment(null)}
+                aria-label="Remove CSV"
+                className="shrink-0 rounded-full p-1 text-on-surface-variant hover:bg-surface-container"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
+          {csvError && (
+            <p className="mb-2 text-[10px] font-medium text-error">{csvError}</p>
+          )}
+
           <div className={ui.inputRow}>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isTyping}
+              aria-label="Upload a diet or exercise plan as CSV"
+              title="Upload a CSV plan"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container disabled:opacity-40"
+            >
+              <Paperclip size={18} />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv,text/plain"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleCsvFile(file);
+                e.target.value = '';
+              }}
+            />
             <input
               type="text"
               value={message}
@@ -1163,14 +1277,14 @@ export default function ChatBot({ mode = 'floating', onClose }: ChatBotProps) {
                   handleSend();
                 }
               }}
-              placeholder="Ask V anything..."
+              placeholder={attachment ? 'Add a note (optional)…' : 'Ask V anything...'}
               aria-label="Message V"
               className={ui.input}
             />
             <button
               type="button"
               onClick={() => handleSend()}
-              disabled={!message.trim() || isTyping}
+              disabled={(!message.trim() && !attachment) || isTyping}
               aria-label="Send message"
               className={ui.send}
             >

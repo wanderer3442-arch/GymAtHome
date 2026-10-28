@@ -6,6 +6,7 @@ import { useState, useMemo } from 'react';
 import { Check, Sun, CloudSun, Moon, ChevronLeft, ChevronRight, UtensilsCrossed } from 'lucide-react';
 import { useStore } from '@/lib/store-context';
 import { sumMealNutrition, getFoodById } from '@/lib/calculations';
+import { localDateKey } from '@/lib/date';
 import { DayFoodIntake } from '@/lib/types';
 
 function CalorieRing({ consumed, target }: { consumed: number; target: number }) {
@@ -56,7 +57,7 @@ export default function MealPlanPage() {
   const { calculations, foodPreferences, addMeal, meals, getMealsForDate } = useStore();
   const [weekOffset, setWeekOffset] = useState(0);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateKey();
   const todayDayIdx = new Date().getDay();
   const todayDayKey = dayKeys[todayDayIdx];
 
@@ -188,7 +189,7 @@ export default function MealPlanPage() {
         dayIdx,
         dayName: d.toLocaleDateString('en-US', { weekday: 'short' }),
         dayNum: d.getDate(),
-        isToday: d.toISOString().split('T')[0] === today,
+        isToday: localDateKey(d) === today,
         totalCalories: totalCals,
         hasBreakfast: (prefs.breakfast?.length || 0) > 0,
         hasLunch: (prefs.lunch?.length || 0) > 0,

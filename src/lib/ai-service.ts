@@ -1,9 +1,9 @@
 import { allFoods } from './food-database';
 import { FoodItem } from './types';
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-const GEMINI_MODEL = 'gemini-3.6-flash';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 // Cloudflare Worker proxy — key lives server-side, never in the app.
 const AI_PROXY_URL = (process.env.NEXT_PUBLIC_AI_PROXY_URL || '').trim().replace(/\/+$/, '');
@@ -11,13 +11,15 @@ const APP_CLIENT_SECRET = (process.env.NEXT_PUBLIC_APP_CLIENT_SECRET || '').trim
 
 function getGeminiKey(): string | null {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('gemini_api_key');
+    // `gemini_api_key` is the legacy dev-only slot; the new builds store the
+    // Groq key. Read both so a dev machine keeps working after the switch.
+    return localStorage.getItem('groq_api_key') || localStorage.getItem('gemini_api_key');
   }
   return null;
 }
 
 export function getCurrentModel(): string {
-  return GEMINI_MODEL;
+  return GROQ_MODEL;
 }
 
 export function isApiKeySet(): boolean {
@@ -53,7 +55,7 @@ async function callGemini(
   onDelta?: (delta: string) => void
 ): Promise<string> {
   const payload: Record<string, any> = {
-    model: GEMINI_MODEL,
+    model: GROQ_MODEL,
     messages,
     max_tokens: maxTokens,
     temperature: 0.7,
@@ -68,8 +70,9 @@ async function callGemini(
     if (APP_CLIENT_SECRET) headers['X-App-Client'] = APP_CLIENT_SECRET;
   } else {
     const key = getGeminiKey();
-    if (!key) throw new Error('Gemini API key not configured.');
-    url = `${GEMINI_API_URL}?key=${key}`;
+    if (!key) throw new Error('Groq API key not configured.');
+    url = GROQ_API_URL;
+    headers.Authorization = `Bearer ${key}`;
   }
 
   /** One complete request + parse. Throws on any failure (retried below). */
@@ -213,16 +216,17 @@ async function callGemini(
 
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   (window as any).__setGymAtHomeApiKey = (key: string) => {
-    localStorage.setItem('gemini_api_key', key);
-    console.log('✅ Gym at Home Gemini key saved');
+    localStorage.setItem('groq_api_key', key);
+    console.log('✅ Gym at Home Groq key saved');
   };
   (window as any).__clearGymAtHomeApiKey = () => {
+    localStorage.removeItem('groq_api_key');
     localStorage.removeItem('gemini_api_key');
-    console.log('✅ Gym at Home Gemini key removed');
+    console.log('✅ Gym at Home Groq key removed');
   };
   (window as any).__getGymAtHomeApiKey = () => {
-    const key = localStorage.getItem('gemini_api_key');
-    console.log(key ? `Gemini key: ${key.substring(0, 10)}...` : 'No API key set');
+    const key = localStorage.getItem('groq_api_key') || localStorage.getItem('gemini_api_key');
+    console.log(key ? `Groq key: ${key.substring(0, 10)}...` : 'No API key set');
     return key;
   };
 }
@@ -548,7 +552,14 @@ EXERCISE PLAN FLOW — when the user asks for a workout plan, exercise plan, or 
 1. Write short day blocks (Monday, Tuesday, …) with 3-6 exercises each and explicit sets x reps, e.g. "Push-Ups — 3×12".
 2. END the reply with exactly one line in this format (the chat app turns it into a preview the user can save into their Exercise Plan) — if a meal plan was requested too, this is the SECOND JSON line, placed right after the meal one:
 JSON: [{"day":"Monday","exercises":[{"name":"Push-Ups","sets":3,"reps":12}]}]
-3. Use plain exercise names (no equipment brands) and put the JSON line(s) last, nothing after them.${profileBlock}${conditionsBlock}${allergiesBlock}${todayBlock}`;
+3. Use plain exercise names (no equipment brands) and put the JSON line(s) last, nothing after them.
+
+CSV PLAN IMPORT — when the message contains an uploaded CSV of the user's existing diet or exercise plan:
+1. Read the header row and map whatever columns exist: day/date, meal/slot, food/item, quantity/amount/serving, calories/protein/carbs/fat, exercise/name, sets, reps, weight, duration. Ignore empty columns and repeated headers.
+2. Treat every CSV row as real data the user already follows — do NOT ask portion questions, do NOT replace their foods/exercises with generic ones, and do NOT drop rows unless they are clearly blank.
+3. Detect the plan type: food columns → meal JSON; exercise/sets/reps columns → exercise JSON. If the file has both, emit both JSON lines (meal first, then exercise).
+4. Keep the user's day names when present; otherwise group rows sensibly (e.g. one day for a diet list, Monday…Sunday for a split). For meals, prefix each string with Breakfast:/Mid-morning:/Lunch:/Snack:/Dinner: as above; for exercises use "Name — 3 × 12".
+5. Above the JSON lines, give a 3-6 line summary of what you imported (rows read, days, items, anything skipped). Never ask the user to type the plan again.${profileBlock}${conditionsBlock}${allergiesBlock}${todayBlock}`;
 
   const messages: Array<{ role: string; content: any }> = [
     { role: 'system', content: systemPrompt },

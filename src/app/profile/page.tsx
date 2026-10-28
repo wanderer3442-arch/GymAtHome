@@ -27,6 +27,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { useStore, GYMATHOME_STORE_KEY } from '@/lib/store-context';
+import { localDateKey } from '@/lib/date';
 import { estimateExerciseCalories } from '@/lib/calculations';
 import { resizeImageToDataUrl } from '@/lib/photo';
 import { useBackHandler } from '@/lib/back-handler';
@@ -85,7 +86,7 @@ export default function ProfilePage() {
     let count = 0;
     const d = new Date();
     for (let i = 0; i < 30; i++) {
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = localDateKey(d);
       if (getMealsForDate(dateStr).length > 0 || getExercisesForDate(dateStr).length > 0) {
         count++;
       } else if (i > 0) {

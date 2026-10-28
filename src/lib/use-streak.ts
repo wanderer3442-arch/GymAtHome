@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store-context';
+import { localDateKey } from './date';
 
 // Shared toast implementation lives in ToastNotification - re-exported here so
 // existing imports from this module keep working.
@@ -25,7 +26,7 @@ export function useStreakInfo(): StreakInfo {
 
   return useMemo(() => {
     const isActive = (d: Date) => {
-      const ds = d.toISOString().split('T')[0];
+      const ds = localDateKey(d);
       return getMealsForDate(ds).length > 0 || getExercisesForDate(ds).length > 0;
     };
 
@@ -80,7 +81,7 @@ const HYDRATION_REMINDER_THRESHOLD = 0.5;
 
 export function useHydrationReminder() {
   const { calculations, getWaterForDate, addWater } = useStore();
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateKey();
 
   const consumedMl = getWaterForDate(today);
   // calculations.hydration is liters/day; fall back to 2.5 L before profile load.

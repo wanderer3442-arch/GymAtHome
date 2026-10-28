@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Key, Save, CheckCircle, Eye, EyeOff, ArrowLeft, Cpu, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
-const GEMINI_MODEL = 'gemini-3.6-flash';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 export default function DevSettingsPage() {
   const [geminiKey, setGeminiKey] = useState('');
@@ -15,7 +15,7 @@ export default function DevSettingsPage() {
 
   useEffect(() => {
     setIsDev(process.env.NODE_ENV === 'development');
-    const geminiStored = localStorage.getItem('gemini_api_key');
+    const geminiStored = localStorage.getItem('groq_api_key') || localStorage.getItem('gemini_api_key');
     if (geminiStored) setCurrentGeminiKey(geminiStored);
   }, []);
 
@@ -35,7 +35,7 @@ export default function DevSettingsPage() {
 
   const handleSaveGemini = () => {
     if (geminiKey.trim()) {
-      localStorage.setItem('gemini_api_key', geminiKey.trim());
+      localStorage.setItem('groq_api_key', geminiKey.trim());
       setCurrentGeminiKey(geminiKey.trim());
       setGeminiKey('');
       setGeminiSaved(true);
@@ -44,6 +44,7 @@ export default function DevSettingsPage() {
   };
 
   const handleClearGemini = () => {
+    localStorage.removeItem('groq_api_key');
     localStorage.removeItem('gemini_api_key');
     setCurrentGeminiKey('');
   };
@@ -64,14 +65,14 @@ export default function DevSettingsPage() {
           </div>
         </div>
 
-        {/* Gemini API Key Section */}
+        {/* Groq API Key Section */}
         <div className="space-y-4">
           <div className="flex items-center gap-2 mb-4">
             <Sparkles className="w-5 h-5 text-blue-500" />
-            <h2 className="text-headline-sm font-bold text-on-surface">Gemini API Key</h2>
+            <h2 className="text-headline-sm font-bold text-on-surface">Groq API Key</h2>
           </div>
           <p className="text-sm text-on-surface-variant mb-4">
-            Free tier: 15 requests/min, 1M tokens/day. Powers the AI chatbot.
+            Powers the AI chatbot and plan import. In production the key lives in the proxy, not the app.
           </p>
 
           {currentGeminiKey ? (
@@ -79,7 +80,7 @@ export default function DevSettingsPage() {
               <div className="p-3 bg-green-50 border border-green-200 rounded-xl">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="w-4 h-4 text-green-600" />
-                  <span className="text-sm font-medium text-green-800">Gemini Key Configured</span>
+                  <span className="text-sm font-medium text-green-800">Groq Key Configured</span>
                 </div>
                 <p className="text-xs text-green-700 font-mono mt-1">
                   {currentGeminiKey.substring(0, 12)}...{currentGeminiKey.substring(currentGeminiKey.length - 4)}
@@ -88,7 +89,7 @@ export default function DevSettingsPage() {
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
                 <div className="flex items-center gap-2">
                   <Cpu className="w-4 h-4 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-800">Model: {GEMINI_MODEL}</span>
+                  <span className="text-sm font-medium text-blue-800">Model: {GROQ_MODEL}</span>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -106,7 +107,7 @@ export default function DevSettingsPage() {
                     type={showGeminiKey ? 'text' : 'password'}
                     value={geminiKey}
                     onChange={(e) => setGeminiKey(e.target.value)}
-                    placeholder="AIza..."
+                    placeholder="gsk_..."
                     className="w-full h-11 px-4 pr-10 rounded-xl border border-outline-variant bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
                   />
                   <button
@@ -140,7 +141,7 @@ export default function DevSettingsPage() {
                   type={showGeminiKey ? 'text' : 'password'}
                   value={geminiKey}
                   onChange={(e) => setGeminiKey(e.target.value)}
-                  placeholder="AIza..."
+                  placeholder="gsk_..."
                   className="w-full h-11 px-4 pr-10 rounded-xl border border-outline-variant bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
                 />
                 <button
@@ -157,22 +158,22 @@ export default function DevSettingsPage() {
                 className="w-full py-3 bg-primary text-on-primary rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {geminiSaved ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                {geminiSaved ? 'Saved!' : 'Save Gemini Key'}
+                {geminiSaved ? 'Saved!' : 'Save Groq Key'}
               </button>
               <a
-                href="https://aistudio.google.com/apikey"
+                href="https://console.groq.com/keys"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block text-center text-sm text-primary hover:underline"
               >
-                Get free key from Google AI Studio →
+                Get a free key from Groq Console →
               </a>
             </div>
           )}
         </div>
 
         <p className="text-xs text-on-surface-variant/60 text-center mt-6">
-          Free tier: 15 requests/min • Key stored in browser only
+          Groq free tier · Key stored in browser only
         </p>
       </div>
     </div>

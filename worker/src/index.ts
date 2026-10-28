@@ -1,12 +1,17 @@
 export interface Env {
-  GEMINI_API_KEY: string;
+  GEMINI_API_KEY?: string;
+  GROQ_API_KEY?: string;
+  GROQ_MODEL?: string;
+  AI_PROVIDER?: string;
   APP_CLIENT_SECRET: string;
 }
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
-const DEFAULT_MODEL = 'gemini-3.6-flash';
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash';
+const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
 
-// Keep below Gemini free-tier 15 RPM. Window is per isolate (best-effort).
+// Groq free tier is the primary limiter now. Window is per isolate (best-effort).
 const RPM_LIMIT = 12;
 let windowStart = 0;
 let windowCount = 0;
@@ -100,9 +105,24 @@ export default {
       return json({ error: 'Forbidden' }, 403);
     }
 
-    if (!env.GEMINI_API_KEY) {
+    if (!env.GEMINI_API_KEY && !env.GROQ_API_KEY) {
       return json({ error: 'Server misconfigured' }, 500);
     }
+
+    // Groq is the primary provider now; Gemini stays as a fallback so an
+    // existing deployment keeps working until GROQ_API_KEY is set.
+    const provider: 'groq' | 'gemini' =
+      env.AI_PROVIDER === 'gemini' || env.AI_PROVIDER === 'groq'
+        ? env.AI_PROVIDER
+        : env.GROQ_API_KEY
+          ? 'groq'
+          : 'gemini';
+    const apiKey = provider === 'groq' ? env.GROQ_API_KEY : env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return json({ error: 'Server misconfigured' }, 500);
+    }
+    const model =
+      provider === 'groq' ? env.GROQ_MODEL || DEFAULT_GROQ_MODEL : DEFAULT_GEMINI_MODEL;
 
     const now = Date.now();
     if (now - windowStart >= 60_000) {
@@ -161,19 +181,23 @@ export default {
 
     let upstream: Response;
     try {
-      upstream = await fetch(GEMINI_URL, {
+      const payload: Record<string, unknown> = {
+        model,
+        messages,
+        max_tokens: maxTokens,
+        temperature,
+      };
+      // Gemini always reasons; Groq only accepts the knob on gpt-oss models.
+      if (provider === 'gemini' || model.startsWith('openai/gpt-oss')) {
+        payload.reasoning_effort = effort;
+      }
+      upstream = await fetch(provider === 'groq' ? GROQ_URL : GEMINI_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${env.GEMINI_API_KEY}`,
+          Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({
-          model: DEFAULT_MODEL,
-          messages,
-          max_tokens: maxTokens,
-          temperature,
-          reasoning_effort: effort,
-        }),
+        body: JSON.stringify(payload),
       });
     } catch {
       return json({ error: 'AI service unreachable. Try again shortly.' }, 502);
