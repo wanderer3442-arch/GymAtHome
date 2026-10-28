@@ -3,7 +3,8 @@ import { FoodItem } from './types';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+// Groq decommissioned llama-3.3-70b-versatile on 16 Aug 2026.
+const GROQ_MODEL = 'openai/gpt-oss-120b';
 
 // Cloudflare Worker proxy — key lives server-side, never in the app.
 const AI_PROXY_URL = (process.env.NEXT_PUBLIC_AI_PROXY_URL || '').trim().replace(/\/+$/, '');
@@ -60,6 +61,9 @@ async function callGemini(
     max_tokens: maxTokens,
     temperature: 0.7,
   };
+  // gpt-oss models reason before answering; low effort keeps responses quick
+  // and leaves most of the token budget for the visible answer.
+  if (GROQ_MODEL.startsWith('openai/gpt-oss')) payload.reasoning_effort = 'low';
   if (onDelta) payload.stream = true;
 
   let url: string;
@@ -541,18 +545,19 @@ HTML FORMATTING — for multi-part answers you may use this safe HTML subset (th
 - If the answer contains a table or box, use HTML tags throughout that answer (bold = <strong>, bullets = <ul>); short one-liner answers can stay plain text with **bold** and emoji
 
 MEAL PLAN FLOW — when the user asks for a meal plan, diet plan, or "plan my meals":
-1. Do NOT write the full plan immediately. First ask ONE short round of concrete portion questions about how much of each food they actually eat every day — ask for grams and give a familiar reference (1 idli ≈ 50 g, 1 roti ≈ 40 g, 1 katori ≈ 150 g, 1 cup ≈ 200 g) — e.g. "How many idlis (or grams) do you eat for breakfast?", "How many rotis at lunch — 1 roti is about 40 g?", "How much rice for dinner — 1 katori is about 150 g?", "Tea with sugar — how many cups a day?". Keep it to 3-4 quantity questions in one short paragraph, like a friend asking about your routine.
-2. When they answer with quantities (e.g. "2 idlis, 3 rotis, 1 katori rice"), THEN build the plan using EXACTLY those foods and those quantities in every slot. Every countable food MUST include its amount in grams in parentheses — "2 idlis (100 g) + sambar (150 g)", never vague words like "a serving". Only water, salt, spices and "to taste" items may skip the gram amount. If they already gave quantities up front, skip the questions and build directly.
-3. Always END the final plan reply with exactly one line in this format (the chat app turns it into a preview the user can save into their Meal Plan):
+1. If the message already contains quantities, counts or grams for the foods they eat (e.g. "2 idlis, 3 rotis, 1 katori rice"), or asks for a simple/quick/just-give-me plan, SKIP the questions and go straight to step 3 — build the plan in this same reply. Never ask for a portion the user already gave.
+2. Otherwise ask ONE short round of concrete portion questions about how much of each food they actually eat every day — ask for grams and give a familiar reference (1 idli ≈ 50 g, 1 roti ≈ 40 g, 1 katori ≈ 150 g, 1 cup ≈ 200 g) — e.g. "How many idlis (or grams) do you eat for breakfast?", "How many rotis at lunch — 1 roti is about 40 g?", "How much rice for dinner — 1 katori is about 150 g?", "Tea with sugar — how many cups a day?". Keep it to 3-4 quantity questions in one short paragraph, like a friend asking about your routine.
+3. When they answer with quantities (e.g. "2 idlis, 3 rotis, 1 katori rice"), build the plan using EXACTLY those foods and those quantities in every slot. Every countable food MUST include its amount in grams in parentheses — "2 idlis (100 g) + sambar (150 g)", never vague words like "a serving". Only water, salt, spices and "to taste" items may skip the gram amount.
+4. Always END the final plan reply with exactly one line in this format (the chat app turns it into a preview the user can save into their Meal Plan):
 JSON: [{"day":"Today","meals":["Breakfast: 2 idlis (100 g) + sambar (150 g)","Mid-morning: 1 banana (118 g)","Lunch: 3 rotis (120 g) + dal (150 g)","Snack: 1 cup curd (200 g)","Dinner: 1 katori rice (150 g) + mixed veg (150 g)"]}]
-Every meal string MUST start with its slot name and a colon — Breakfast:, Mid-morning:, Lunch:, Snack:, Dinner: — followed by the REAL foods, their quantities AND the gram amount in parentheses. Use 4-6 short strings. Put the JSON line last, nothing after it, and keep the human-readable plan above it.
-4. If the same message ALSO asks for a workout plan, output the meal JSON line first and then the exercise JSON line directly after it (two plan lines total, nothing else after them).
+Every meal string MUST start with its slot name and a colon — Breakfast:, Mid-morning:, Lunch:, Snack:, Dinner: — followed by the REAL foods, their quantities AND the gram amount in parentheses. Use 4-6 short strings. The JSON array MUST repeat every meal from the plan above — never a shortened example or a single placeholder line. Put the JSON line last, nothing after it, and keep the human-readable plan above it.
+5. If the same message ALSO asks for a workout plan, output the meal JSON line first and then the exercise JSON line directly after it (two plan lines total, nothing else after them).
 
 EXERCISE PLAN FLOW — when the user asks for a workout plan, exercise plan, or weekly gym schedule:
 1. Write short day blocks (Monday, Tuesday, …) with 3-6 exercises each and explicit sets x reps, e.g. "Push-Ups — 3×12".
 2. END the reply with exactly one line in this format (the chat app turns it into a preview the user can save into their Exercise Plan) — if a meal plan was requested too, this is the SECOND JSON line, placed right after the meal one:
 JSON: [{"day":"Monday","exercises":[{"name":"Push-Ups","sets":3,"reps":12}]}]
-3. Use plain exercise names (no equipment brands) and put the JSON line(s) last, nothing after them.
+3. Use plain exercise names (no equipment brands). The JSON array MUST repeat every day and exercise from the plan above — never a shortened example. Put the JSON line(s) last, nothing after them.
 
 CSV PLAN IMPORT — when the message contains an uploaded CSV of the user's existing diet or exercise plan:
 1. Read the header row and map whatever columns exist: day/date, meal/slot, food/item, quantity/amount/serving, calories/protein/carbs/fat, exercise/name, sets, reps, weight, duration. Ignore empty columns and repeated headers.

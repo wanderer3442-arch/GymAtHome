@@ -218,7 +218,7 @@ export default function ExportReportsPage() {
     const timer = setTimeout(async () => {
       try {
         await document.fonts?.ready;
-        const images = renderReportPoster(model);
+        const images = await renderReportPoster(model);
         if (alive) setPosterImages(images);
       } catch {
         if (alive) setPosterImages([]);
@@ -251,7 +251,7 @@ export default function ExportReportsPage() {
           .join('\n');
         await saveOrShareFile(`gymathome-protocol-${slug}-${stamp}.csv`, 'text/csv', textToBase64(csv));
       } else {
-        const images = posterImages.length ? posterImages : renderReportPoster(model);
+        const images = posterImages.length ? posterImages : await renderReportPoster(model);
         if (!images.length) throw new Error('No pages');
         const pdf = posterToPdf(images);
         const dataUri = pdf.output('datauristring');

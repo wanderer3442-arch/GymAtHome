@@ -73,7 +73,23 @@ class Flow {
 }
 
 // ─── Cover ──────────────────────────────────────────────────────────────────
-function coverPage(m: ReportModel): Sheet {
+let logoPromise: Promise<HTMLImageElement | null> | null = null;
+
+/** Load the app icon once; the poster renderer is otherwise synchronous. */
+function loadLogo(): Promise<HTMLImageElement | null> {
+  if (typeof window === 'undefined') return Promise.resolve(null);
+  if (!logoPromise) {
+    logoPromise = new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = '/logo.png';
+    });
+  }
+  return logoPromise;
+}
+
+function coverPage(m: ReportModel, logo: HTMLImageElement | null): Sheet {
   const s = new Sheet('cover');
   const { ctx } = s;
   const HERO = 340;
@@ -98,10 +114,19 @@ function coverPage(m: ReportModel): Sheet {
   pool(PW - 120, 300, 170, 'rgba(255,255,255,0.12)');
   pool(20, 360, 190, 'rgba(0,20,12,0.35)');
 
-  // brand row
-  fillRR(ctx, M, 28, 34, 34, 10, 'rgba(255,255,255,0.16)');
-  strokeRR(ctx, M, 28, 34, 34, 10, 'rgba(255,255,255,0.40)', 1);
-  text(ctx, 'V', M + 17, 50.5, 16, 800, '#ffffff', 'center');
+  // brand row — the real app icon, not a letter mark
+  if (logo) {
+    ctx.save();
+    roundRect(ctx, M, 28, 34, 34, 10);
+    ctx.clip();
+    ctx.drawImage(logo, M, 28, 34, 34);
+    ctx.restore();
+    strokeRR(ctx, M, 28, 34, 34, 10, 'rgba(255,255,255,0.40)', 1);
+  } else {
+    fillRR(ctx, M, 28, 34, 34, 10, 'rgba(255,255,255,0.16)');
+    strokeRR(ctx, M, 28, 34, 34, 10, 'rgba(255,255,255,0.40)', 1);
+    text(ctx, 'V', M + 17, 50.5, 16, 800, '#ffffff', 'center');
+  }
   spaced(ctx, 'GYM AT HOME', M + 44, 43, 9, 800, 'rgba(255,255,255,0.97)', 2);
   text(ctx, 'HEALTH & FITNESS PROTOCOL', M + 44, 55, 6.4, 600, 'rgba(255,255,255,0.62)');
 
@@ -240,7 +265,7 @@ function coverPage(m: ReportModel): Sheet {
   ctx.fillRect(M, quoteY, CW, 54);
   ctx.restore();
   text(ctx, 'Small days. Big years.', M + 20, quoteY + 25, 14, 800, '#ffffff');
-  text(ctx, 'Consistency compounds — V has your back.', M + 20, quoteY + 41, 7.4, 500, 'rgba(255,255,255,0.72)');
+  text(ctx, 'Consistency compounds - Gym at Home has your back.', M + 20, quoteY + 41, 7.4, 500, 'rgba(255,255,255,0.72)');
 
   return s;
 }
@@ -630,10 +655,11 @@ function bodyPages(m: ReportModel): Sheet[] {
 }
 
 // ─── Assembly ───────────────────────────────────────────────────────────────
-export function renderReportPoster(m: ReportModel): string[] {
+export async function renderReportPoster(m: ReportModel): Promise<string[]> {
   if (typeof document === 'undefined') return [];
 
-  const sheets: Sheet[] = [coverPage(m)];
+  const logo = await loadLogo();
+  const sheets: Sheet[] = [coverPage(m, logo)];
   if (m.sections.nutrition) sheets.push(...nutritionPages(m));
   if (m.sections.exercise) sheets.push(...trainingPages(m));
   if (m.sections.body || m.sections.habits || m.sections.health) sheets.push(...bodyPages(m));

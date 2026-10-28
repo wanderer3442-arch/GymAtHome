@@ -27,7 +27,8 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { useStore, GYMATHOME_STORE_KEY } from '@/lib/store-context';
-import { localDateKey } from '@/lib/date';
+import { streakEndingToday } from '@/lib/date';
+import { BADGE_CATALOG, STREAK_BADGE_ID, STREAK_TIERS } from '@/lib/badges';
 import { estimateExerciseCalories } from '@/lib/calculations';
 import { resizeImageToDataUrl } from '@/lib/photo';
 import { useBackHandler } from '@/lib/back-handler';
@@ -82,20 +83,18 @@ export default function ProfilePage() {
     return exercises.reduce((sum, ex) => sum + estimateExerciseCalories(ex), 0);
   }, [exercises]);
 
-  const streak = useMemo(() => {
-    let count = 0;
-    const d = new Date();
-    for (let i = 0; i < 30; i++) {
-      const dateStr = localDateKey(d);
-      if (getMealsForDate(dateStr).length > 0 || getExercisesForDate(dateStr).length > 0) {
-        count++;
-      } else if (i > 0) {
-        break;
-      }
-      d.setDate(d.getDate() - 1);
-    }
-    return count;
-  }, [meals, exercises]);
+  const streak = useMemo(
+    () =>
+      streakEndingToday(
+        (key) => getMealsForDate(key).length > 0 || getExercisesForDate(key).length > 0
+      ),
+    [meals, exercises]
+  );
+
+  const streakBadge = badges.find((b) => b.id === STREAK_BADGE_ID);
+  const streakLevel = streakBadge ? streakBadge.level ?? 0 : -1;
+  const nextStreakTier =
+    streakLevel + 1 < STREAK_TIERS.length ? STREAK_TIERS[streakLevel + 1] : null;
 
   const latestMetric = bodyMetrics.length > 0
     ? [...bodyMetrics].sort((a, b) => b.date.localeCompare(a.date))[0]
@@ -499,33 +498,83 @@ export default function ProfilePage() {
 
           {/* Achievements / Badges */}
           <div className="lg:col-span-3 bg-surface rounded-xl border border-outline-variant p-6">
-            <h2 className="text-headline-md font-semibold text-on-surface mb-4 flex items-center gap-2">
-              <Award className="w-5 h-5 text-primary" />
-              Achievements
-            </h2>
-            {badges.length === 0 ? (
-              <p className="text-sm text-on-surface-variant text-center py-6 italic">
-                No achievements yet. Keep logging meals, workouts, and water to earn badges!
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {badges.map((badge) => (
-                  <div
-                    key={badge.id}
-                    className="p-4 bg-primary/5 border border-primary/20 rounded-xl text-center"
-                  >
-                    <div className="text-3xl mb-2">{badge.icon}</div>
-                    <p className="text-label-md font-semibold text-on-surface">{badge.name}</p>
-                    <p className="text-xs text-on-surface-variant mt-1">{badge.description}</p>
-                    {badge.unlockedAt && (
-                      <p className="text-xs text-primary mt-2 font-medium">
-                        {new Date(badge.unlockedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </p>
-                    )}
-                  </div>
-                ))}
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-headline-md font-semibold text-on-surface flex items-center gap-2">
+                <Award className="w-5 h-5 text-primary" />
+                Achievements
+              </h2>
+              <span className="rounded-full bg-surface-container-high px-2 py-1 text-label-md font-bold text-on-surface">
+                {badges.length} / {BADGE_CATALOG.length}
+              </span>
+            </div>
+
+            {/* Leveled consistency badge — one badge that upgrades in place */}
+            <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 p-3">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl leading-none shrink-0">
+                  {streakBadge?.icon ?? STREAK_TIERS[0].icon}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-label-md font-bold text-on-surface truncate">
+                    {streakBadge?.name ?? 'Consistency Badge'}
+                  </p>
+                  <p className="text-[10px] text-on-surface-variant">
+                    {streakBadge
+                      ? `${streak}-day streak · level ${streakLevel + 1} of ${STREAK_TIERS.length}`
+                      : 'Log meals or workouts 3 days in a row to unlock'}
+                    {streakBadge && nextStreakTier
+                      ? ` · ${Math.max(0, nextStreakTier.days - streak)} days to ${nextStreakTier.name}`
+                      : ''}
+                  </p>
+                </div>
+                {streakBadge && (
+                  <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary">
+                    Lv {streakLevel + 1}
+                  </span>
+                )}
               </div>
-            )}
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-container-high">
+                <div
+                  className="h-full rounded-full bg-primary transition-all"
+                  style={{
+                    width: nextStreakTier
+                      ? `${Math.min(100, Math.round((streak / nextStreakTier.days) * 100))}%`
+                      : '100%',
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+              {BADGE_CATALOG.filter((b) => b.id !== STREAK_BADGE_ID).map((b) => {
+                const unlocked = badges.some((x) => x.id === b.id);
+                const unlockedAt = badges.find((x) => x.id === b.id)?.unlockedAt;
+                return (
+                  <div
+                    key={b.id}
+                    title={b.description}
+                    className={`flex items-start gap-2.5 rounded-xl border p-3 ${
+                      unlocked
+                        ? 'border-primary/20 bg-primary/5'
+                        : 'border-outline-variant/40 bg-surface-container opacity-60'
+                    }`}
+                  >
+                    <span className="text-2xl leading-none shrink-0">{b.icon}</span>
+                    <div className="min-w-0">
+                      <p className="text-label-md font-semibold text-on-surface">{b.name}</p>
+                      <p className="text-xs text-on-surface-variant">{b.description}</p>
+                      <p className={`mt-1 text-[10px] font-semibold ${unlocked ? 'text-primary' : 'text-on-surface-variant'}`}>
+                        {unlocked
+                          ? unlockedAt
+                            ? `Unlocked ${new Date(unlockedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                            : 'Unlocked'
+                          : 'Locked'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 

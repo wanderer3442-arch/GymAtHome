@@ -9,7 +9,8 @@ export interface Env {
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash';
-const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
+// Groq decommissioned llama-3.3-70b-versatile on 16 Aug 2026.
+const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-120b';
 
 // Groq free tier is the primary limiter now. Window is per isolate (best-effort).
 const RPM_LIMIT = 12;

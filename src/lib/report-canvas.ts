@@ -509,7 +509,7 @@ export function monthCalendar(
                 ? HEAT[3]
                 : HEAT[4];
       fillRR(ctx, cx, cy, cell, cell, 5, color);
-      const ink = day.future ? '#c3d2cc' : day.value >= 0.67 ? '#ffffff' : C.body;
+      const ink = day.future ? '#9db3aa' : day.value >= 0.67 ? '#ffffff' : C.body;
       text(ctx, String(day.day), cx + cell / 2, cy + cell / 2 + 2.6, 7.2, 700, ink, 'center');
     });
   });

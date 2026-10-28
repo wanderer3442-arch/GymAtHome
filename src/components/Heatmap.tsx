@@ -48,7 +48,9 @@ export default function Heatmap({
   compact = false,
   showSummary = true,
 }: HeatmapProps) {
-  const cell = compact ? 'h-7 w-7 text-[10px]' : 'h-9 w-9 text-[11px]';
+  const cell = compact
+    ? 'h-7 w-7 text-[10px]'
+    : 'h-8 w-8 text-[10px] sm:h-9 sm:w-9 sm:text-[11px]';
   const todayKey = localDateKey();
 
   const legend = (
@@ -117,7 +119,7 @@ export default function Heatmap({
         title={dayTitle(day, unit)}
         className={`flex items-center justify-center font-semibold ${sizeClass} ${
           day.future
-            ? 'bg-surface-container/40 text-outline/40'
+            ? 'bg-surface-container/60 text-outline/70'
             : `${heatColorClass(day.value)} ${day.value > 0.67 ? 'text-on-primary' : 'text-on-surface'}`
         } ${day.key === todayKey ? 'ring-2 ring-primary ring-offset-1 ring-offset-surface' : ''}`}
       >
@@ -129,7 +131,7 @@ export default function Heatmap({
   const monthCalendar = (list: HeatDay[]) => {
     const weeks = toWeeks(list);
     return (
-      <div className="inline-grid gap-1">
+      <div className="mx-auto grid w-fit gap-1">
         <div className="grid grid-cols-7 gap-1">
           {WEEKDAYS.map((d) => (
             <span key={d} className="text-center text-[9px] font-semibold uppercase tracking-wide text-on-surface-variant">
@@ -168,18 +170,20 @@ export default function Heatmap({
     );
   };
 
+  // Seven columns keep the last day on the same row on narrow phones; the old
+  // flex-wrap layout pushed it onto a second row that looked cut off.
   const weekCalendar = () => (
-    <div className="flex flex-wrap gap-2">
+    <div className="mx-auto grid w-full max-w-[420px] grid-cols-7 gap-1.5 sm:gap-2">
       {days.map((day) => (
-        <div key={day.key} className="flex flex-col items-center gap-1">
+        <div key={day.key} className="flex min-w-0 flex-col items-center gap-1">
           <span className="text-[10px] font-semibold uppercase text-on-surface-variant">
             {day.date.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 3)}
           </span>
           <span
             title={dayTitle(day, unit)}
-            className={`flex items-center justify-center font-semibold ${compact ? 'h-9 w-9' : 'h-11 w-11'} rounded-lg ${
+            className={`flex aspect-square w-full items-center justify-center rounded-lg font-semibold ${compact ? 'text-xs' : 'text-sm'} ${
               day.future
-                ? 'bg-surface-container/40 text-outline/40'
+                ? 'bg-surface-container/60 text-outline/70'
                 : `${heatColorClass(day.value)} ${day.value > 0.67 ? 'text-on-primary' : 'text-on-surface'}`
             }`}
           >
@@ -191,12 +195,12 @@ export default function Heatmap({
   );
 
   const weekGrid = () => (
-    <div className="flex flex-wrap gap-2">
+    <div className="mx-auto grid w-full max-w-[420px] grid-cols-7 gap-1.5 sm:gap-2">
       {days.map((day) => (
         <span
           key={day.key}
           title={dayTitle(day, unit)}
-          className={`${compact ? 'h-9 w-9' : 'h-11 w-11'} rounded-lg ${heatColorClass(day.value)} ${
+          className={`aspect-square w-full rounded-lg ${heatColorClass(day.value)} ${
             day.key === todayKey ? 'ring-2 ring-primary ring-offset-1 ring-offset-surface' : ''
           }`}
         />
@@ -218,7 +222,7 @@ export default function Heatmap({
             </span>
           ))}
         </div>
-        <div className="overflow-x-auto pb-1">
+        <div className="overflow-x-auto p-1">
           <div className="flex gap-[3px]">
             {weeks.map((week, wi) => (
               <div key={wi} className="flex flex-col gap-[3px]">
@@ -257,7 +261,9 @@ export default function Heatmap({
           <p className="text-[11px] font-medium text-on-surface-variant">{heatSummary(days, unit)}</p>
         )}
       </div>
-      <div className="overflow-x-auto">{body()}</div>
+      {/* Padding keeps the today ring (and its offset) from being clipped by
+          the scroll container on the bottom row. */}
+      <div className="-m-1 overflow-x-auto p-1">{body()}</div>
       <div className="flex items-center justify-between gap-3 border-t border-outline-variant/50 pt-2.5">
         {legend}
         <span className="text-[10px] text-on-surface-variant">

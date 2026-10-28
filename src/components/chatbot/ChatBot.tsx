@@ -317,6 +317,112 @@ function parseMealPlanResponse(content: string): { day: string; meals: string[] 
   return [];
 }
 
+// ── Text-plan fallback ───────────────────────────────────────────────────────
+// Models sometimes forget the machine-readable tail. When the answer itself is
+// clearly a plan, parse the visible meal/exercise lines so the Save Plan card
+// still appears instead of leaving the user with no way to keep it.
+
+const PLAN_SLOT_RE =
+  /^(breakfast|mid[-\u2010\u2011\u2012\u2013\u2014 ]?morning(?:\s+snack)?|morning snack|lunch|afternoon snack|evening snack|snack|dinner|pre[-\u2010\u2011\u2012\u2013\u2014 ]?workout|post[-\u2010\u2011\u2012\u2013\u2014 ]?workout|bedtime)\s*[:\u2010\u2011\u2012\u2013\u2014-]\s*(.+)$/i;
+const PLAN_DAY_RE =
+  /^(?:day\s*\d+|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today)\b/i;
+
+function cleanPlanLine(raw: string): string {
+  return raw
+    .replace(/^\s*(?:[-*•#]+|\d+[.)])\s*/, '')
+    .replace(/\*\*/g, '')
+    .replace(/__/g, '')
+    .trim();
+}
+
+/** Drop the `JSON: [...]` tail before reading the human-readable lines. */
+function planText(content: string): string {
+  return content
+    .replace(/\n?\s*(?:JSON:\s*)?\[\s*\{\s*"day"[\s\S]*\]\s*$/, '')
+    .trim();
+}
+
+function parseMealPlanFromText(content: string): { day: string; meals: string[] }[] {
+  const days: { day: string; meals: string[] }[] = [];
+  let current: { day: string; meals: string[] } | null = null;
+
+  for (const raw of planText(content).split(/\r?\n/)) {
+    const line = cleanPlanLine(raw);
+    if (!line) continue;
+
+    const slot = line.match(PLAN_SLOT_RE);
+    if (slot) {
+      if (!current) {
+        current = { day: 'Today', meals: [] };
+        days.push(current);
+      }
+      const label = slot[1].replace(/\s+/g, ' ').replace(/^./, (c) => c.toUpperCase());
+      const items = slot[2].replace(/\s{2,}/g, ' ').trim();
+      if (items) current.meals.push(`${label}: ${items}`);
+      continue;
+    }
+
+    const dayMatch = line.match(PLAN_DAY_RE);
+    if (dayMatch) {
+      current = { day: dayMatch[0].replace(/\s+/g, ' '), meals: [] };
+      days.push(current);
+    }
+  }
+
+  const withMeals = days.filter((d) => d.meals.length > 0);
+  const total = withMeals.reduce((n, d) => n + d.meals.length, 0);
+  return total >= 2 ? withMeals : [];
+}
+
+function parseExercisePlanFromText(
+  content: string
+): { day: string; exercises: { name: string; sets: number; reps: number }[] }[] {
+  const days: { day: string; exercises: { name: string; sets: number; reps: number }[] }[] = [];
+  let current: { day: string; exercises: { name: string; sets: number; reps: number }[] } | null =
+    null;
+
+  for (const raw of planText(content).split(/\r?\n/)) {
+    const line = cleanPlanLine(raw);
+    if (!line) continue;
+
+    const dayMatch = line.match(PLAN_DAY_RE);
+    const hasSets = /\d+\s*[x×]\s*\d+/.test(line);
+    if (dayMatch && !hasSets) {
+      current = { day: dayMatch[0].replace(/\s+/g, ' '), exercises: [] };
+      days.push(current);
+      continue;
+    }
+
+    // Accept "3 × 8", "3 × 8-10" and "3 sets x 10 reps"; models often add a
+    // range, a check mark or "(per leg)" after the numbers.
+    const ex =
+      line.match(
+        /^(.+?)\s*[-\u2010\u2011\u2012\u2013\u2014]\s*(\d+)\s*[x×]\s*(\d+)(?:\s*[-\u2010\u2011\u2012\u2013\u2014]\s*\d+)?\b/i
+      ) ||
+      line.match(
+        /^(.+?)\s*[:\u2010\u2011\u2012\u2013\u2014-]\s*(\d+)\s*sets?\s*(?:of\s*)?[x×]?\s*(\d+)(?:\s*[-\u2010\u2011\u2012\u2013\u2014]\s*\d+)?\b/i
+      ) ||
+      line.match(
+        /^(.+?)\s+(\d+)\s*[x×]\s*(\d+)(?:\s*[-\u2010\u2011\u2012\u2013\u2014]\s*\d+)?\b/i
+      );
+    if (!ex) continue;
+
+    const name = ex[1].trim();
+    if (!name || name.length > 60) continue;
+    if (!current) {
+      current = { day: 'Today', exercises: [] };
+      days.push(current);
+    }
+    current.exercises.push({
+      name,
+      sets: Math.max(1, parseInt(ex[2], 10) || 3),
+      reps: Math.max(1, parseInt(ex[3], 10) || 10),
+    });
+  }
+
+  return days.filter((d) => d.exercises.length > 0);
+}
+
 // Helper to create exercise plan from AI response
 function parseExercisePlanResponse(content: string): { day: string; exercises: { name: string; sets: number; reps: number }[] }[] {
   for (const data of jsonArraysIn(content)) {
@@ -972,9 +1078,27 @@ export default function ChatBot({ mode = 'floating', onClose }: ChatBotProps) {
 
       // Parse every plan block in the reply. A single answer can carry both a
       // meal plan and a workout plan ("plan my meals and give me a gym split"),
-      // and each one becomes its own saveable card.
-      const mealPlan = parseMealPlanResponse(response);
-      const exercisePlan = parseExercisePlanResponse(response);
+      // and each one becomes its own saveable card. If the model skipped the
+      // JSON tail (or returned a shortened example), fall back to the visible
+      // plan lines so the save option is always there.
+      const askedForPlan =
+        /\b(plan|routine|split|diet|meal|workout|schedule|what should i eat)\b/i.test(sendText);
+      const jsonMealPlan = parseMealPlanResponse(response);
+      const jsonExercisePlan = parseExercisePlanResponse(response);
+      const textMealPlan = askedForPlan ? parseMealPlanFromText(response) : [];
+      const textExercisePlan = askedForPlan ? parseExercisePlanFromText(response) : [];
+
+      const countMeals = (days: { meals: string[] }[]) =>
+        days.reduce((n, d) => n + d.meals.length, 0);
+      const countExercises = (days: { exercises: unknown[] }[]) =>
+        days.reduce((n, d) => n + d.exercises.length, 0);
+
+      const mealPlan =
+        countMeals(textMealPlan) > countMeals(jsonMealPlan) ? textMealPlan : jsonMealPlan;
+      const exercisePlan =
+        countExercises(textExercisePlan) > countExercises(jsonExercisePlan)
+          ? textExercisePlan
+          : jsonExercisePlan;
 
       const planBlocks: PlanBlock[] = [];
       if (mealPlan.length) {
