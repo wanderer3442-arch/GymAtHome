@@ -10,11 +10,11 @@ import {
   ClipboardList,
   Heart,
   Download,
-  User,
   ChevronLeft,
   ChevronRight,
   MessageSquareWarning,
   ShieldCheck,
+  CalendarCheck,
 } from 'lucide-react';
 import { useStore } from '@/lib/store-context';
 import { useSidebar } from '@/lib/sidebar-context';
@@ -25,10 +25,10 @@ const navItems = [
   { href: '/calculator', label: 'Essentials', icon: Calculator },
   { href: '/exercise-plan', label: 'Exercises', icon: Dumbbell },
   { href: '/meal-plan', label: 'Meal', icon: Utensils },
-  { href: '/logger', label: 'Logger', icon: ClipboardList },
+  { href: '/logger', label: 'Health Logger', icon: ClipboardList },
+  { href: '/habits', label: 'Habits & To-Do', icon: CalendarCheck },
   { href: '/health-assistant', label: 'Health', icon: Heart },
   { href: '/export-reports', label: 'Download', icon: Download },
-  { href: '/profile', label: 'Profile', icon: User },
   { href: '/report-problem', label: 'Report a Problem', icon: MessageSquareWarning },
   { href: '/privacy', label: 'Privacy Policy', icon: ShieldCheck },
 ];
@@ -72,7 +72,7 @@ export default function Sidebar() {
         </div>
 
         {/* Navigation */}
-        <nav className="p-3 space-y-1">
+        <nav className="p-3 pb-24 space-y-1 overflow-y-auto max-h-[calc(100vh-4rem)]">
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -94,19 +94,35 @@ export default function Sidebar() {
           })}
         </nav>
 
-        {/* User Section */}
-        <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-outline-variant/30">
+        {/* Profile — lives at the bottom with the user's name, not in the nav */}
+        <Link
+          href="/profile"
+          onClick={handleNavClick}
+          title={collapsed ? profile?.name || 'Profile' : undefined}
+          className={`absolute bottom-0 left-0 right-0 flex items-center gap-2 p-3 border-t border-outline-variant/30 bg-surface-container-lowest hover:bg-surface-container transition-colors ${
+            collapsed ? 'justify-center' : ''
+          } ${pathname === '/profile' ? 'text-primary' : 'text-on-surface'}`}
+        >
+          <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
+            {profile?.photo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={profile.photo} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-sm font-medium text-primary">
+                {(profile?.name || 'U').charAt(0).toUpperCase()}
+              </span>
+            )}
+          </div>
           {!collapsed && (
-            <div className="flex items-center gap-2 px-3 py-2">
-              <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                <span className="text-sm font-medium text-primary">
-                  {(profile?.name || 'U').charAt(0).toUpperCase()}
-                </span>
+            <>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm truncate">{profile?.name || 'User'}</p>
+                <p className="text-[11px] text-on-surface-variant">View profile</p>
               </div>
-              <span className="text-sm text-on-surface truncate">{profile?.name || 'User'}</span>
-            </div>
+              <ChevronRight className="w-4 h-4 text-on-surface-variant" />
+            </>
           )}
-        </div>
+        </Link>
 
         {/* Collapse Toggle - Right Edge (desktop only) */}
         <button

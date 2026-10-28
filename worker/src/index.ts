@@ -128,6 +128,7 @@ export default {
       messages?: unknown;
       max_tokens?: unknown;
       temperature?: unknown;
+      reasoning_effort?: unknown;
     } | null = null;
     try {
       body = JSON.parse(text);
@@ -142,12 +143,21 @@ export default {
 
     const maxTokens =
       typeof body!.max_tokens === 'number'
-        ? Math.min(Math.max(Math.floor(body!.max_tokens), 1), 2048)
-        : 768;
+        ? Math.min(Math.max(Math.floor(body!.max_tokens), 1), 8192)
+        : 2048;
     const temperature =
       typeof body!.temperature === 'number'
         ? Math.min(Math.max(body!.temperature, 0), 2)
         : 0.7;
+    // Gemini 3 spends "thinking" tokens before it writes, and those count
+    // against max_tokens. At the old 2048 cap a long plan could burn the whole
+    // budget reasoning and the bubble stopped mid-sentence ("…kcal/day (+").
+    // Low effort leaves room for the answer; still adjustable per request.
+    const effort =
+      typeof body!.reasoning_effort === 'string' &&
+      ['minimal', 'low', 'medium', 'high'].includes(body!.reasoning_effort)
+        ? body!.reasoning_effort
+        : 'low';
 
     let upstream: Response;
     try {
@@ -162,6 +172,7 @@ export default {
           messages,
           max_tokens: maxTokens,
           temperature,
+          reasoning_effort: effort,
         }),
       });
     } catch {

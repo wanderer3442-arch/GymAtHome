@@ -77,7 +77,7 @@ export default function ActivePlans() {
                       className={`h-full rounded-full transition-all duration-500 ${
                         plan.type === 'meal' ? 'bg-tertiary' : 'bg-primary'
                       }`}
-                      style={{ width: `${(plan.progress / plan.total) * 100}%` }}
+                      style={{ width: `${plan.total > 0 ? Math.min((plan.progress / plan.total) * 100, 100) : 0}%` }}
                     />
                   </div>
                 </div>

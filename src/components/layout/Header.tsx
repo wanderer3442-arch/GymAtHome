@@ -67,10 +67,15 @@ export default function Header({ title, subtitle }: HeaderProps) {
             onClick={() => setShowProfile(!showProfile)}
             className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-surface-container transition-colors"
           >
-            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-              <span className="text-sm font-medium text-primary">
-                {displayName.slice(0, 2).toUpperCase()}
-              </span>
+            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center overflow-hidden shrink-0">
+              {profile?.photo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={profile.photo} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-sm font-medium text-primary">
+                  {displayName.slice(0, 2).toUpperCase()}
+                </span>
+              )}
             </div>
             <ChevronDown className={`w-4 h-4 text-on-surface-variant hidden sm:block transition-transform ${showProfile ? 'rotate-180' : ''}`} />
           </button>

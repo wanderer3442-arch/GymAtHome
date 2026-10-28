@@ -1,6 +1,9 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useToast } from '@/components/ui/ToastNotification';
+import { Badge } from './types';
+
 import {
   Profile,
   Calculations,
@@ -12,7 +15,6 @@ import {
   WeeklyFoodPreference,
   WaterLog,
   SleepLog,
-  Badge,
 } from './types';
 import { calculateAll } from './calculations';
 import { allFoods } from './food-database';
@@ -119,6 +121,7 @@ interface StoreContextType {
 
 const defaultProfile: Profile = {
   name: null,
+  photo: null,
   gender: null,
   age: null,
   height: null,
@@ -156,6 +159,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isProfileSet, setIsProfileSet] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const { showToast } = useToast();
 
   // Load data from the single local store on mount
   useEffect(() => {
@@ -232,10 +236,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const addMeal = (meal: MealEntry) => {
     setMeals(prev => [...prev, meal]);
+    // Check for badges after adding a meal
+    checkBadges();
   };
 
   const removeMeal = (id: string) => {
     setMeals(prev => prev.filter(m => m.id !== id));
+    // Check for badges after removing a meal
+    checkBadges();
   };
 
   const getMealsForDate = (date: string) => {
@@ -244,10 +252,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const addExercise = (entry: ExerciseEntry) => {
     setExercises(prev => [...prev, entry]);
+    // Check for badges after adding exercise
+    checkBadges();
   };
 
   const removeExercise = (id: string) => {
     setExercises(prev => prev.filter(e => e.id !== id));
+    // Check for badges after removing exercise
+    checkBadges();
   };
 
   const getExercisesForDate = (date: string) => {
@@ -284,6 +296,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const addWater = (amount: number) => {
     const today = new Date().toISOString().split('T')[0];
     setWaterLogs(prev => [...prev, { date: today, amount, loggedAt: new Date().toISOString() }]);
+    // Check for water badge
+    checkBadges();
   };
 
   const getWaterForDate = (date: string) => {
@@ -320,13 +334,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     const pushBadge = (id: string) => {
       const def = BADGE_CATALOG.find(b => b.id === id);
-      if (def) newBadges.push({ ...def, unlockedAt: today });
+      if (def) {
+        newBadges.push({ ...def, unlockedAt: today });
+        // Show toast notification for badge unlock
+        showToast(`🏆 New Badge Unlocked: ${def.name}`, 'success', 5000);
+      }
     };
+
+    const streakStart = new Date(today);
+    const streakEnd = new Date(streakStart);
+    streakEnd.setDate(streakEnd.getDate() + 7);
 
     // 7-day streak
     if (!hasBadge('streak_7')) {
       let streak = 0;
-      const d = new Date();
+      const d = new Date(today);
       for (let i = 0; i < 30; i++) {
         const dateStr = d.toISOString().split('T')[0];
         if (getMealsForDate(dateStr).length > 0 || getExercisesForDate(dateStr).length > 0) {
@@ -359,7 +381,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // 7-day water tracking
     if (!hasBadge('water_7')) {
       let waterDays = 0;
-      const d = new Date();
+      const d = new Date(today);
       for (let i = 0; i < 7; i++) {
         const dateStr = d.toISOString().split('T')[0];
         if (getWaterForDate(dateStr) > 0) waterDays++;
@@ -373,7 +395,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // Hit protein target 5 days
     if (!hasBadge('protein_5') && calculations) {
       let proteinDays = 0;
-      const d = new Date();
+      const d = new Date(today);
       for (let i = 0; i < 30; i++) {
         const dateStr = d.toISOString().split('T')[0];
         const dayMeals = getMealsForDate(dateStr);

@@ -5,6 +5,11 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Scale, Flame, Save, CheckCircle } from 'lucide-react';
 import { useStore } from '@/lib/store-context';
+import {
+  requestLocationPermission,
+  requestNotificationPermission,
+  completePermissionOnboarding,
+} from '@/lib/permissions';
 
 type ActivityLevel = '1.2' | '1.375' | '1.55' | '1.725' | '1.9';
 
@@ -78,13 +83,19 @@ export default function CalculatorPage() {
     else if (bmi < 30) bmiCategory = 'Overweight';
     else bmiCategory = 'Obese';
 
-    // Macros (30% protein, 45% carbs, 25% fats)
-    const protein = Math.round((tdee * 0.30) / 4);
-    const carbs = Math.round((tdee * 0.45) / 4);
-    const fats = Math.round((tdee * 0.25) / 9);
+    // Goal target — the split must match the "Fat loss target" line above,
+    // not maintenance TDEE (was showing Maintenance macros for a cut)
+    const target =
+      goal === 'lose' ? Math.max(0, tdee - 500) : goal === 'gain' ? tdee + 300 : tdee;
+
+    // Macros (30% protein, 45% carbs, 25% fats) of the GOAL TARGET
+    const protein = Math.round((target * 0.30) / 4);
+    const carbs = Math.round((target * 0.45) / 4);
+    const fats = Math.round((target * 0.25) / 9);
 
     return {
       tdee: Math.round(tdee),
+      target: Math.round(target),
       bmr: Math.round(bmr),
       bmi: parseFloat(bmi.toFixed(1)),
       bmiCategory,
@@ -92,7 +103,7 @@ export default function CalculatorPage() {
       carbs,
       fats,
     };
-  }, [gender, age, height, weight, activity]);
+  }, [gender, age, height, weight, activity, goal]);
 
   return (
     <DashboardLayout title="Essentials" subtitle="Step 2 of 2 — calculate your foundational health metrics.">
@@ -250,17 +261,17 @@ export default function CalculatorPage() {
             <div className="bg-primary rounded-2xl p-6 text-on-primary shadow-lg relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-xl" />
               <h3 className="text-label-md text-primary-fixed-dim uppercase tracking-wider mb-2 relative z-10">
-                Target TDEE
+                Daily Calorie Target
               </h3>
               <div className="flex items-baseline gap-2 relative z-10">
-                <span className="text-display-lg font-bold">{results?.tdee?.toLocaleString() ?? '—'}</span>
+                <span className="text-display-lg font-bold">{results?.target?.toLocaleString() ?? '—'}</span>
                 <span className="text-body-md opacity-80">kcal/day</span>
               </div>
               <p className="text-label-md mt-4 opacity-90 relative z-10">
                 {goal === 'lose'
-                  ? `Fat loss target: ~${(results ? Math.max(0, results.tdee - 500) : 0).toLocaleString()} kcal/day (TDEE − 500, USDA).`
+                  ? `Fat loss = TDEE ${results?.tdee?.toLocaleString() ?? '—'} − 500 (USDA).`
                   : goal === 'gain'
-                  ? `Muscle gain target: ~${(results ? results.tdee + 300 : 0).toLocaleString()} kcal/day (TDEE + 300, ACSM).`
+                  ? `Muscle gain = TDEE ${results?.tdee?.toLocaleString() ?? '—'} + 300 (ACSM).`
                   : `Maintenance calories based on Mifflin-St Jeor formula + ${activityLevels.find((l) => l.value === activity)?.label.split('(')[0].trim()}.`}
               </p>
             </div>
@@ -298,7 +309,7 @@ export default function CalculatorPage() {
             {/* Macro Split Card */}
             <div className="bg-surface-container-lowest rounded-xl p-6 border border-surface-container-highest shadow-[0_10px_15px_-3px_rgba(11,28,48,0.05),0_4px_6px_-2px_rgba(11,28,48,0.025)]">
               <h3 className="text-headline-md font-semibold text-on-surface mb-4">
-                Macro Split (Maintenance)
+                Macro Split ({goal === 'lose' ? 'Fat Loss' : goal === 'gain' ? 'Muscle Gain' : 'Maintenance'})
               </h3>
               <div className="space-y-4">
                 <div>
@@ -316,7 +327,7 @@ export default function CalculatorPage() {
                     <span className="text-on-surface-variant">{results?.carbs ?? '—'}g</span>
                   </div>
                   <div className="w-full bg-surface-container-highest rounded-full h-2">
-                    <div className="bg-tertiary-container h-2 rounded-full" style={{ width: '45%' }} />
+                    <div className="bg-tertiary h-2 rounded-full" style={{ width: '45%' }} />
                   </div>
                 </div>
                 <div>
@@ -342,10 +353,19 @@ export default function CalculatorPage() {
                   });
                   setIsProfileSet(true);
                   setSaved(true);
-                  setTimeout(() => {
-                    setSaved(false);
-                    router.push('/dashboard');
-                  }, 1000);
+                  router.replace('/dashboard');
+                  // Permissions ride along with the Save tap: location dialog
+                  // first, then notifications — no separate Permissions screen.
+                  void (async () => {
+                    try {
+                      await requestLocationPermission();
+                      await requestNotificationPermission();
+                      completePermissionOnboarding();
+                      window.dispatchEvent(new Event('gymathome:permissions-changed'));
+                    } catch {
+                      // Best-effort: the app works fine without either.
+                    }
+                  })();
                 }}
                 className="w-full mt-6 bg-primary hover:bg-surface-tint text-on-primary py-3 rounded-lg text-label-md font-bold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
               >

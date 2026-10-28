@@ -35,6 +35,13 @@ android {
         }
     }
     buildTypes {
+        debug {
+            // Side-by-side install: the dev build gets its own package id
+            // (com.gymathome.app.dev) so it installs NEXT TO the store/open-testing
+            // build instead of over it. Your existing app + data are never touched.
+            applicationIdSuffix ".dev"
+            versionNameSuffix "-dev"
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'

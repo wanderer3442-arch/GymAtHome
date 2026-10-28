@@ -242,3 +242,86 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ─── AI message HTML rendering (DOMPurify-sanitized) ───────────────────── */
+.ai-html {
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+.ai-html h3,
+.ai-html h4 {
+  font-weight: 700;
+  color: #2ee59d;
+  margin: 0.7em 0 0.3em;
+}
+.ai-html h3:first-child,
+.ai-html h4:first-child {
+  margin-top: 0;
+}
+.ai-html p {
+  margin: 0.35em 0;
+}
+.ai-html strong {
+  font-weight: 700;
+}
+.ai-html ul,
+.ai-html ol {
+  margin: 0.4em 0;
+  padding-left: 1.3em;
+}
+.ai-html ul {
+  list-style: disc;
+}
+.ai-html ol {
+  list-style: decimal;
+}
+.ai-html li {
+  margin: 0.15em 0;
+}
+.ai-html table {
+  width: 100%;
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+  margin: 0.5em 0;
+  font-size: 0.78rem;
+}
+.ai-html th,
+.ai-html td {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.ai-html th {
+  background: rgba(46, 229, 157, 0.16);
+  color: #2ee59d;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ai-html tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.04);
+}
+.ai-html a {
+  color: #2ee59d;
+  text-decoration: underline;
+}
+.ai-box {
+  padding: 8px 10px;
+  border-radius: 10px;
+  margin: 0.5em 0;
+  border-left: 3px solid;
+  font-size: 0.82rem;
+}
+.ai-box-info {
+  background: rgba(0, 132, 255, 0.12);
+  border-color: #4da3ff;
+}
+.ai-box-good {
+  background: rgba(46, 229, 157, 0.12);
+  border-color: #2ee59d;
+}
+.ai-box-warn {
+  background: rgba(255, 196, 0, 0.14);
+  border-color: #ffc400;
+}

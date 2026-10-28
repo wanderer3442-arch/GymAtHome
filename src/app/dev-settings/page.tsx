@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Key, Save, CheckCircle, Eye, EyeOff, ArrowLeft, Cpu, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
-const GEMINI_MODEL = 'gemini-2.5-flash-lite';
+const GEMINI_MODEL = 'gemini-3.6-flash';
 
 export default function DevSettingsPage() {
   const [geminiKey, setGeminiKey] = useState('');
@@ -71,7 +71,7 @@ export default function DevSettingsPage() {
             <h2 className="text-headline-sm font-bold text-on-surface">Gemini API Key</h2>
           </div>
           <p className="text-sm text-on-surface-variant mb-4">
-            Free tier: 15 requests/min, 1M tokens/day. Powers AI chatbot and food photo recognition.
+            Free tier: 15 requests/min, 1M tokens/day. Powers the AI chatbot.
           </p>
 
           {currentGeminiKey ? (

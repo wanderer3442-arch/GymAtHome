@@ -8,6 +8,8 @@ export type Goal = 'lose' | 'maintain' | 'gain';
 
 export interface Profile {
   name: string | null;
+  /** Profile photo as a small JPEG data URL (downscaled before storing). */
+  photo?: string | null;
   gender: Gender | null;
   age: number | null;
   height: number | null; // cm

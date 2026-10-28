@@ -1,7 +1,7 @@
 'use client';
 
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   User,
   Calendar,
@@ -15,6 +15,7 @@ import {
   Trash2,
   TriangleAlert,
   X,
+  Camera,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -27,6 +28,7 @@ import {
 } from 'recharts';
 import { useStore, GYMATHOME_STORE_KEY } from '@/lib/store-context';
 import { estimateExerciseCalories } from '@/lib/calculations';
+import { resizeImageToDataUrl } from '@/lib/photo';
 import { useBackHandler } from '@/lib/back-handler';
 
 export default function ProfilePage() {
@@ -56,6 +58,19 @@ export default function ProfilePage() {
   const [saved, setSaved] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file later
+    if (!file) return;
+    try {
+      const dataUrl = await resizeImageToDataUrl(file);
+      updateProfile({ photo: dataUrl });
+    } catch {
+      // Unsupported/corrupt image - ignore, old photo stays.
+    }
+  };
 
   useBackHandler(showDeleteModal, () => setShowDeleteModal(false));
 
@@ -125,9 +140,45 @@ export default function ProfilePage() {
           {/* Profile Card */}
           <div className="bg-surface rounded-xl border border-outline-variant p-6">
             <div className="text-center">
-              <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <User className="w-12 h-12 text-primary" />
+              <div className="relative w-24 h-24 mx-auto mb-3">
+                <div className="w-24 h-24 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center ring-2 ring-primary/20">
+                  {profile.photo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={profile.photo}
+                      alt="Profile photo"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <User className="w-12 h-12 text-primary" />
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  title={profile.photo ? 'Change photo' : 'Add photo'}
+                  aria-label={profile.photo ? 'Change profile photo' : 'Add profile photo'}
+                  className="absolute -bottom-1 -right-1 w-9 h-9 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-md hover:bg-primary/90 active:scale-95 transition-all"
+                >
+                  <Camera className="w-4 h-4" />
+                </button>
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handlePhotoSelect}
+                />
               </div>
+              {profile.photo && (
+                <button
+                  type="button"
+                  onClick={() => updateProfile({ photo: null })}
+                  className="text-xs text-on-surface-variant hover:text-error transition-colors mb-2"
+                >
+                  Remove photo
+                </button>
+              )}
               {editing ? (
                 <input
                   type="text"
@@ -573,6 +624,7 @@ export default function ProfilePage() {
                       Object.keys(localStorage)
                         .filter((k) => k.startsWith('gymathome_chat_count_'))
                         .forEach((k) => localStorage.removeItem(k));
+                      localStorage.removeItem('gymathome_chat_history');
                     } catch {
                       // best-effort wipe
                     }

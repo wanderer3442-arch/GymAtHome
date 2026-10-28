@@ -6,11 +6,8 @@ import {
   Droplets,
   Moon,
   Scale,
-  Check,
-  Clock,
   TrendingUp,
   TrendingDown,
-  Trash2,
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import {
@@ -54,10 +51,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function LoggerPage() {
   const {
-    habits,
-    addHabit,
-    removeHabit,
-    toggleHabitDate,
     bodyMetrics,
     addBodyMetric,
     meals,
@@ -74,21 +67,8 @@ export default function LoggerPage() {
 
   const [selectedHabit, setSelectedHabit] = useState('water');
   const [logValue, setLogValue] = useState('');
-  const [newHabitName, setNewHabitName] = useState('');
-  const [showAddHabit, setShowAddHabit] = useState(false);
 
   const today = new Date().toISOString().split('T')[0];
-
-  const todayHabits = useMemo(() => {
-    if (habits.length === 0) return [];
-    return habits.map((h) => ({
-      ...h,
-      completed: h.completedDates.includes(today),
-    }));
-  }, [habits, today]);
-
-  const completedHabits = todayHabits.filter((h) => h.completed).length;
-  const totalHabits = todayHabits.length;
 
   const waterTargetMl = Math.round((calculations?.hydration || 2.5) * 1000);
   const calorieGoal = calculations?.targetCalories || 0;
@@ -159,27 +139,15 @@ export default function LoggerPage() {
     setLogValue('');
   };
 
-  const addNewHabit = () => {
-    if (!newHabitName.trim()) return;
-    addHabit({
-      id: crypto.randomUUID(),
-      name: newHabitName.trim(),
-      frequency: 'daily',
-      completedDates: [],
-    });
-    setNewHabitName('');
-    setShowAddHabit(false);
-  };
-
   const todayTotalCalories = useMemo(() => {
     return sumMealNutrition(getMealsForDate(today)).calories;
   }, [meals, today]);
 
   return (
-    <DashboardLayout title="Logger Hub" subtitle="Track your daily habits and body metrics">
+    <DashboardLayout title="Health Logger" subtitle="Track your daily health metrics">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Quick Log */}
-        <div className="lg:col-span-2 bg-surface rounded-xl border border-outline-variant p-6">
+        <div className="lg:col-span-3 bg-surface rounded-xl border border-outline-variant p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-headline-md font-semibold text-on-surface">Quick Log</h2>
             <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-label-md font-bold">Today</span>
@@ -267,101 +235,6 @@ export default function LoggerPage() {
               <span className="text-lg sm:text-headline-md font-bold text-primary">{todayTotalCalories.toLocaleString()} kcal</span>
             </div>
           </div>
-        </div>
-
-        {/* Today's Habits */}
-        <div className="bg-surface rounded-xl border border-outline-variant p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-headline-md font-semibold text-on-surface">Today&apos;s Habits</h2>
-            <span className="text-sm text-on-surface-variant">{completedHabits}/{totalHabits}</span>
-          </div>
-          {totalHabits > 0 && (
-            <div className="h-2 bg-surface-container rounded-full overflow-hidden mb-4">
-              <div
-                className="h-full bg-gradient-to-r from-primary to-primary/70 rounded-full transition-all duration-500"
-                style={{ width: `${(completedHabits / totalHabits) * 100}%` }}
-              />
-            </div>
-          )}
-          <div className="space-y-2">
-            {todayHabits.length === 0 ? (
-              <p className="text-label-md text-on-surface-variant py-4 text-center italic">
-                No habits yet. Add one below!
-              </p>
-            ) : (
-              todayHabits.map((habit) => (
-                <div
-                  key={habit.id}
-                  onClick={() => toggleHabitDate(habit.id, today)}
-                  className={`w-full flex items-center gap-3 p-2.5 rounded-lg transition-colors text-left min-w-0 cursor-pointer ${
-                    habit.completed ? 'bg-primary/5' : 'hover:bg-surface-container'
-                  }`}
-                >
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors shrink-0 ${
-                    habit.completed
-                      ? 'bg-primary border-primary text-white'
-                      : 'border-outline-variant hover:border-primary'
-                  }`}>
-                    {habit.completed && <Check className="w-3 h-3" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium truncate ${habit.completed ? 'text-on-surface-variant line-through' : 'text-on-surface'}`}>
-                      {habit.name}
-                    </p>
-                    <p className="text-xs text-on-surface-variant flex items-center gap-1">
-                      <Clock className="w-3 h-3 shrink-0" /> {habit.frequency}
-                    </p>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeHabit(habit.id);
-                    }}
-                    className="text-outline hover:text-error opacity-60 hover:opacity-100 transition-opacity shrink-0 p-1"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* Add Habit */}
-          {showAddHabit ? (
-            <div className="mt-4 p-3 bg-surface-container rounded-lg">
-              <input
-                type="text"
-                value={newHabitName}
-                onChange={(e) => setNewHabitName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addNewHabit()}
-                placeholder="Habit name (e.g., Meditation)"
-                className="w-full h-10 px-3 rounded-lg border border-outline-variant bg-surface text-body-md outline-none focus:border-primary mb-2"
-                autoFocus
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={addNewHabit}
-                  className="flex-1 h-9 bg-primary text-on-primary rounded-lg text-label-md font-bold hover:bg-primary/90 transition-colors"
-                >
-                  Add
-                </button>
-                <button
-                  onClick={() => { setShowAddHabit(false); setNewHabitName(''); }}
-                  className="flex-1 h-9 bg-surface-container text-on-surface-variant rounded-lg text-label-md hover:bg-surface-container-high transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowAddHabit(true)}
-              className="w-full mt-4 py-2.5 border border-dashed border-outline rounded-lg text-label-md text-on-surface-variant hover:bg-surface-container transition-colors flex items-center justify-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Add Habit
-            </button>
-          )}
         </div>
 
         {/* Weight Tracking Line Chart */}
@@ -459,154 +332,6 @@ export default function LoggerPage() {
             <span>Goal: {calorieGoal.toLocaleString()} kcal</span>
             <span>Avg: {Math.round(weeklyData.reduce((sum, d) => sum + d.calories, 0) / weeklyData.length).toLocaleString()} kcal</span>
           </div>
-        </div>
-
-        {/* Habit Consistency - LeetCode Calendar */}
-        <div className="lg:col-span-3 bg-surface rounded-xl border border-outline-variant p-5 md:p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-headline-md font-semibold text-on-surface">Habit Consistency</h2>
-            <div className="flex items-center gap-1.5 text-[10px] text-on-surface-variant">
-              <span>Less</span>
-              <div className="w-3 h-3 rounded bg-surface-container-high" />
-              <div className="w-3 h-3 rounded bg-primary/20" />
-              <div className="w-3 h-3 rounded bg-primary/50" />
-              <div className="w-3 h-3 rounded bg-primary/80" />
-              <div className="w-3 h-3 rounded bg-primary" />
-              <span>More</span>
-            </div>
-          </div>
-          {habits.length === 0 ? (
-            <p className="text-sm text-on-surface-variant text-center py-10 italic">Add habits above to track consistency</p>
-          ) : (
-            <div>
-              {/* Calendar Grid */}
-              <div className="overflow-x-auto no-scrollbar pb-2">
-                {(() => {
-                  const today = new Date();
-                  const startDay = today.getDay();
-                  const totalWeeks = 22;
-                  const weeks: { date: Date; dateStr: string; count: number }[][] = [];
-                  let currentWeek: { date: Date; dateStr: string; count: number }[] = [];
-
-                  const dateCountMap: Record<string, number> = {};
-                  habits.forEach(h => {
-                    h.completedDates.forEach(d => {
-                      dateCountMap[d] = (dateCountMap[d] || 0) + 1;
-                    });
-                  });
-
-                  const totalDays = totalWeeks * 7 + startDay;
-                  for (let i = totalDays; i >= 0; i--) {
-                    const d = new Date(today);
-                    d.setDate(today.getDate() - i);
-                    const ds = d.toISOString().split('T')[0];
-                    const count = dateCountMap[ds] || 0;
-                    currentWeek.push({ date: d, dateStr: ds, count });
-                    if (currentWeek.length === 7) {
-                      weeks.push(currentWeek);
-                      currentWeek = [];
-                    }
-                  }
-                  if (currentWeek.length > 0) weeks.push(currentWeek);
-
-                  const monthLabels: { week: number; label: string }[] = [];
-                  let lastMonth = -1;
-                  weeks.forEach((week, wi) => {
-                    const m = week[0]?.date.getMonth();
-                    if (m !== undefined && m !== lastMonth) {
-                      monthLabels.push({ week: wi, label: week[0].date.toLocaleDateString('en', { month: 'short' }) });
-                      lastMonth = m;
-                    }
-                  });
-
-                  const getBg = (count: number) => {
-                    if (count === 0) return 'bg-surface-container-high';
-                    const total = habits.length;
-                    const ratio = count / total;
-                    if (ratio <= 0.25) return 'bg-primary/20';
-                    if (ratio <= 0.5) return 'bg-primary/50';
-                    if (ratio <= 0.75) return 'bg-primary/80';
-                    return 'bg-primary';
-                  };
-
-                  return (
-                    <div className="min-w-max">
-                      {/* Month labels row */}
-                      <div className="flex ml-[42px] mb-1">
-                        {monthLabels.map((ml, i) => (
-                          <div
-                            key={i}
-                            className="text-[10px] text-on-surface-variant font-medium"
-                            style={{ width: `${ml.week * 22}px`, flexShrink: 0 }}
-                          >
-                            {ml.label}
-                          </div>
-                        ))}
-                      </div>
-                      {/* Grid row: day labels + cells */}
-                      <div className="flex gap-[6px]">
-                        <div className="flex flex-col gap-[5px] mr-1.5">
-                          {['Mon', '', 'Wed', '', 'Fri', '', ''].map((day, i) => (
-                            <div key={i} className="h-4 text-[10px] text-on-surface-variant flex items-center font-medium">{day}</div>
-                          ))}
-                        </div>
-                        <div className="flex gap-[6px]">
-                          {weeks.map((week, wi) => (
-                            <div key={wi} className="flex flex-col gap-[6px]">
-                              {week.map((day, di) => (
-                                <div
-                                  key={di}
-                                  className={`w-4 h-4 rounded-[3px] ${getBg(day.count)} transition-colors cursor-default`}
-                                  title={`${day.dateStr}: ${day.count}/${habits.length} habits`}
-                                />
-                              ))}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Habit Stats */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-5 pt-4 border-t border-outline-variant/30">
-                {habits.map(h => {
-                  let streak = 0;
-                  const today = new Date();
-                  for (let d = 0; d < 365; d++) {
-                    const dateStr = new Date(today);
-                    dateStr.setDate(today.getDate() - d);
-                    const ds = dateStr.toISOString().split('T')[0];
-                    if (h.completedDates.includes(ds)) streak++;
-                    else break;
-                  }
-                  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-                  const completedThisMonth = h.completedDates.filter(d => {
-                    const dt = new Date(d);
-                    return dt.getMonth() === today.getMonth() && dt.getFullYear() === today.getFullYear();
-                  }).length;
-                  const level = streak >= 30 ? '🔥' : streak >= 7 ? '⭐' : streak >= 3 ? '✅' : '○';
-
-                  return (
-                    <div key={h.id} className="bg-surface-container rounded-lg p-3 border border-outline-variant/30">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-sm">{level}</span>
-                          <span className="text-xs font-semibold text-on-surface truncate">{h.name}</span>
-                        </div>
-                        <span className={`text-xs font-bold ${streak >= 7 ? 'text-primary' : 'text-on-surface-variant'}`}>{streak}d</span>
-                      </div>
-                      <div className="w-full bg-surface rounded-full h-1.5">
-                        <div className="bg-primary h-1.5 rounded-full transition-all" style={{ width: `${Math.min((completedThisMonth / daysInMonth) * 100, 100)}%` }} />
-                      </div>
-                      <p className="text-[10px] text-on-surface-variant mt-1.5">{completedThisMonth}/{daysInMonth} days this month</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
 
       </div>

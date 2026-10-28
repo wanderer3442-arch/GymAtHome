@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { readStoredProfile } from '@/lib/store-context';
 
 // Entry gate (no sign-in): profile details → Essentials → dashboard.
+// Permissions are asked from the Essentials Save tap, not via a screen.
 export default function Home() {
   const router = useRouter();
 

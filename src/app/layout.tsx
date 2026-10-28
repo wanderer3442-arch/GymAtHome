@@ -5,6 +5,8 @@ import { StoreProvider } from "@/lib/store-context";
 import { SidebarProvider } from "@/lib/sidebar-context";
 import DatabaseInit from "@/components/DatabaseInit";
 import BackButtonHandler from "@/components/BackButtonHandler";
+import ToastNotification from "@/components/ui/ToastNotification";
+import NotificationEngine from "@/components/NotificationEngine";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -30,7 +32,7 @@ const CONTENT_SECURITY_POLICY = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: blob:",
-  "connect-src 'self' https://generativelanguage.googleapis.com https://*.workers.dev",
+  "connect-src 'self' https://generativelanguage.googleapis.com https://*.workers.dev https://api.open-meteo.com",
   "frame-src 'none'",
   "object-src 'none'",
   "base-uri 'self'",
@@ -56,6 +58,8 @@ export default function RootLayout({
             <SidebarProvider>
               {children}
               <BackButtonHandler />
+              <ToastNotification />
+              <NotificationEngine />
             </SidebarProvider>
           </StoreProvider>
         </DatabaseInit>

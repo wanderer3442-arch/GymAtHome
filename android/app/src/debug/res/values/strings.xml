@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug/dev variant only: overrides the launcher label so the side-by-side
+     dev install is visually distinguishable from the store build. -->
+<resources>
+    <string name="app_name">Gym at Home (Dev)</string>
+</resources>

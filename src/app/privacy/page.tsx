@@ -1,7 +1,46 @@
 'use client';
 
-import { ShieldCheck, HardDrive, Sparkles, Mail, EyeOff } from 'lucide-react';
+import Link from 'next/link';
+import {
+  ShieldCheck,
+  HardDrive,
+  Sparkles,
+  Mail,
+  EyeOff,
+  Bell,
+  MapPin,
+  Wifi,
+  Settings,
+  ArrowRight,
+} from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+
+const permissions = [
+  {
+    icon: Bell,
+    name: 'Notifications',
+    android: 'POST_NOTIFICATIONS · SCHEDULE_EXACT_ALARM',
+    body: 'Streak reminders, meal and hydration nudges, and motivation messages. They are scheduled on your phone — not pushed from a server. Asked once, right after you tap Save on the Essentials step, and never when the app opens. If Android also offers "Allow exact alarms", that only makes those reminders fire on time.',
+  },
+  {
+    icon: MapPin,
+    name: 'Location (approximate or precise)',
+    android: 'ACCESS_COARSE_LOCATION · ACCESS_FINE_LOCATION',
+    body: 'One reading is used only to look up the current temperature so hydration and heat advice match your weather. The coordinates are not stored as a location history and are never sent to our servers. Asked at the same moment as notifications, and asked again only if you tap Allow yourself.',
+  },
+  {
+    icon: Wifi,
+    name: 'Internet access',
+    android: 'INTERNET',
+    body: 'Needed for the AI chat, the weather lookup and AI meal/workout plans. Android grants this at install, so you will not see a dialog for it.',
+  },
+  {
+    icon: Settings,
+    name: 'Reminder reliability',
+    android: 'RECEIVE_BOOT_COMPLETED · WAKE_LOCK',
+    body: 'Keeps the reminders you scheduled alive after a phone restart and lets them fire while the screen is off. Nothing is collected — no dialog is shown for these.',
+  },
+];
 
 const sections = [
   {
@@ -17,7 +56,7 @@ const sections = [
   {
     icon: Sparkles,
     title: 'AI features (Google Gemini)',
-    body: 'When you chat with the AI assistant, ask for photo-based food recognition or request a plan, the text (and any photo you choose to attach) is sent through our proxy to Google Gemini to generate a reply. That prompt may include health details you type. We do not store these conversations, and Google processes the request to generate the response.',
+    body: 'When you chat with the AI assistant and request a plan, the text you type (plus your profile numbers you have filled in) is sent through our proxy to Google Gemini to generate a reply. That prompt may include health details you type. We do not store these conversations, and Google processes the request to generate the response.',
   },
   {
     icon: ShieldCheck,
@@ -36,7 +75,7 @@ export default function PrivacyPage() {
             <h2 className="text-headline-sm font-semibold">Privacy Policy</h2>
           </div>
           <p className="text-body-md text-on-surface-variant">
-            Effective September 28, 2026 · Applies to the Gym at Home mobile app.
+            Effective October 27, 2026 · Applies to the Gym at Home mobile app.
           </p>
         </div>
 
@@ -49,6 +88,53 @@ export default function PrivacyPage() {
             <p className="text-body-md text-on-surface-variant leading-relaxed">{s.body}</p>
           </div>
         ))}
+
+        {/* Permissions — what we ask for and the exact reason */}
+        <div className="bg-surface rounded-2xl border border-outline-variant p-6 space-y-4">
+          <div className="flex items-center gap-2 text-on-surface">
+            <ShieldCheck className="w-5 h-5 text-primary" />
+            <h3 className="text-body-lg font-semibold">Permissions we ask for — and why</h3>
+          </div>
+          <p className="text-body-md text-on-surface-variant leading-relaxed">
+            Nothing is requested when the app launches or while you fill in your profile. Android
+            only shows a permission dialog when you take the action that needs it, and you can
+            decline — the app keeps working, just without that extra feature.
+          </p>
+
+          <div className="space-y-3">
+            {permissions.map((p) => (
+              <div
+                key={p.name}
+                className="flex gap-3 rounded-xl border border-outline-variant/60 bg-surface-container-lowest p-3"
+              >
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <p.icon className="w-4 h-4 text-primary" />
+                </div>
+                <div className="min-w-0 space-y-1">
+                  <p className="text-body-md font-semibold text-on-surface">{p.name}</p>
+                  <p className="text-[11px] font-mono text-on-surface-variant/80 break-words">
+                    {p.android}
+                  </p>
+                  <p className="text-body-md text-on-surface-variant leading-relaxed">{p.body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-body-md text-on-surface-variant leading-relaxed">
+            We never request the camera, photos, microphone, contacts, SMS or call logs — the app
+            contains no code that reads them. You can review or revoke any permission at any time
+            in Android <span className="font-medium text-on-surface">Settings → Apps → Gym at Home → Permissions</span>.
+          </p>
+
+          <Link
+            href="/permissions"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-on-primary text-label-md font-bold hover:bg-primary/90 transition-colors"
+          >
+            Manage permissions
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
 
         <div className="bg-surface rounded-2xl border border-outline-variant p-6 space-y-2">
           <div className="flex items-center gap-2 text-on-surface">
