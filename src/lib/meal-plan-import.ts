@@ -1,5 +1,5 @@
 import { allFoods } from './food-database';
-import { scaleNutrition } from './food-database/utils';
+import { isBulkServing, makeSelection, parseGrams, servingUnitGrams } from './food-portion';
 import { DayFoodIntake, FoodItem, FoodSelection, WeeklyFoodPreference } from './types';
 
 /**
@@ -112,46 +112,34 @@ function slotFromPrefix(entry: string): { slot: Slot | null; rest: string } {
 }
 
 function toSelection(text: string): FoodSelection {
-  // "3 rotis" -> 3 servings; plain names stay at 1.
+  // "3 rotis" -> 3 pieces; plain names stay at 1. An explicit gram amount in
+  // the text ("3 rotis (120 g)") always wins.
   const qtyMatch = text.match(/^\s*(\d+(?:\.\d+)?)\s*/);
   const qty = qtyMatch ? Math.max(1, Math.round(parseFloat(qtyMatch[1]))) : 1;
+  const explicitGrams = parseGrams(text);
   const food = matchFoodText(text);
   if (food) {
-    // Food DB numbers are per 100 g/ml, so one serving is `serving.amount` —
-    // the same maths the food logger uses. Multiplying the per-100 g value by
-    // the portion count (the old behaviour) overstated calories badly:
-    // "5 almonds" became 2,895 kcal.
-    const label = food.servingSizes?.[0]?.label ?? '';
-    // A bare count ("5 almonds", "10 cashews") is a number of pieces, not five
-    // one-ounce servings. When the only serving size is a bulk weight and the
-    // text names no unit, count it as one serving instead of multiplying.
-    const bulkServing = /^\s*(?:\d+(?:\.\d+)?\s*(?:oz|g|grams?|ml)\b|100\s*g\b)/i.test(label);
+    // A bare count ("5 almonds") is a number of pieces, not five bulk servings:
+    // when the only serving size is a weight and the text names no unit, treat
+    // it as one serving instead of multiplying.
     const hasUnit =
       /\b(?:g|gram|grams|kg|ml|l|oz|cups?|tbsp|tsp|tablespoons?|teaspoons?|katori|bowls?|glasses?|cans?|slices?|pieces?|scoops?|plates?|servings?)\b/i.test(
         text
       );
-    const servings = bulkServing && !hasUnit && qty > 1 ? 1 : qty;
-    const nut = scaleNutrition(food, 0, servings);
-    return {
-      foodId: food.id,
-      foodName: food.name,
-      calories: nut.calories,
-      protein: nut.protein,
-      carbs: nut.carbohydrates,
-      fat: nut.fat,
-      servingSize: label || '1 serving',
-      quantity: servings,
-    };
+    const servings = isBulkServing(food) && !hasUnit && qty > 1 ? 1 : qty;
+    const grams = explicitGrams ?? Math.round(servingUnitGrams(food) * servings);
+    return makeSelection(food, grams);
   }
   return {
     foodId: '',
-    foodName: text,
+    foodName: text.replace(/\s*\([^)]*\b(?:g|grams?|ml)\b[^)]*\)\s*$/i, '').trim() || text,
     calories: 0,
     protein: 0,
     carbs: 0,
     fat: 0,
-    servingSize: '1 serving',
-    quantity: qty,
+    servingSize: explicitGrams ? `${explicitGrams} g` : '1 serving',
+    quantity: 1,
+    ...(explicitGrams ? { grams: explicitGrams } : {}),
   };
 }
 

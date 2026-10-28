@@ -7,7 +7,7 @@
  * export and the PDF always agree.
  */
 
-import { allFoods } from './food-database';
+import { findFood } from './food-portion';
 import { dateFromKey, localDateKey } from './date';
 import type {
   BodyMetric,
@@ -120,8 +120,6 @@ export interface ReportModel {
   includeNotes: boolean;
 }
 
-const foodIndex = new Map(allFoods.map((f) => [f.id, f]));
-
 const DAY_FOCUS: Record<string, string> = {
   Monday: 'Push',
   Tuesday: 'Pull',
@@ -163,7 +161,7 @@ const addDays = (d: Date, n: number) => {
 };
 
 export function mealKcal(m: MealEntry): number {
-  const food = foodIndex.get(m.foodId);
+  const food = findFood(m.foodId, m.foodName);
   return Math.round((food ? food.nutrition.calories : 0) * (m.quantity || 1));
 }
 

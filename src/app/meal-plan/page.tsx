@@ -7,6 +7,7 @@ import { Check, Sun, CloudSun, Moon, ChevronLeft, ChevronRight, UtensilsCrossed 
 import { useStore } from '@/lib/store-context';
 import { sumMealNutrition, getFoodById } from '@/lib/calculations';
 import { localDateKey } from '@/lib/date';
+import { selectionGrams, withGrams } from '@/lib/food-portion';
 import { DayFoodIntake } from '@/lib/types';
 
 function CalorieRing({ consumed, target }: { consumed: number; target: number }) {
@@ -54,8 +55,10 @@ const mealTypeIcons: Record<string, { icon: React.ReactNode; color: string }> = 
 const dayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
 
 export default function MealPlanPage() {
-  const { calculations, foodPreferences, addMeal, meals, getMealsForDate } = useStore();
+  const { calculations, foodPreferences, setFoodPreferences, addMeal, meals, getMealsForDate } = useStore();
   const [weekOffset, setWeekOffset] = useState(0);
+  const [editing, setEditing] = useState<{ meal: 'breakfast' | 'lunch' | 'dinner'; index: number } | null>(null);
+  const [editGrams, setEditGrams] = useState('');
 
   const today = localDateKey();
   const todayDayIdx = new Date().getDay();
@@ -80,16 +83,39 @@ export default function MealPlanPage() {
   const handleTick = (mealType: 'breakfast' | 'lunch' | 'dinner', item: any) => {
     const key = `${mealType}::${item.foodName || item.name}`;
     if (loggedSet.has(key)) return;
+    const grams = selectionGrams(item);
     addMeal({
       id: crypto.randomUUID(),
       foodId: item.foodId || '',
       foodName: item.foodName || item.name,
-      servingSize: typeof item.servingSize === 'string'
-        ? { label: item.servingSize, amount: 100, unit: 'g' }
-        : item.servingSize || { label: '1 serving', amount: 100, unit: 'g' },
-      quantity: 1,
+      servingSize: { label: `${grams} g`, amount: grams, unit: 'g' },
+      // Food DB values are per 100 g, so the logged quantity is the portion in
+      // 100 g units — this keeps dashboard totals in sync with the plan.
+      quantity: grams / 100,
       mealType,
       loggedAt: new Date().toISOString(),
+    });
+  };
+
+  const startGramsEdit = (meal: 'breakfast' | 'lunch' | 'dinner', index: number, item: any) => {
+    setEditing({ meal, index });
+    setEditGrams(String(selectionGrams(item)));
+  };
+
+  const commitGramsEdit = (meal: 'breakfast' | 'lunch' | 'dinner', index: number, item: any) => {
+    const grams = parseInt(editGrams, 10);
+    setEditing(null);
+    if (!Number.isFinite(grams) || grams <= 0 || grams === selectionGrams(item)) return;
+
+    const dayPrefs = foodPreferences[todayDayKey];
+    if (!dayPrefs || Array.isArray(dayPrefs)) return;
+    const current = [...(dayPrefs[meal] || [])];
+    if (!current[index]) return;
+    current[index] = withGrams(current[index], grams);
+
+    setFoodPreferences({
+      ...foodPreferences,
+      [todayDayKey]: { ...dayPrefs, [meal]: current },
     });
   };
 
@@ -200,7 +226,7 @@ export default function MealPlanPage() {
   }, [foodPreferences, weekOffset, today]);
 
   return (
-    <DashboardLayout title="Meal Plan" subtitle={totalPlannedItems > 0 ? `${totalPlannedItems} foods planned today` : 'Set up your weekly meal plan to get started'}>
+    <DashboardLayout title="Meal Plan" subtitle={totalPlannedItems > 0 ? `${totalPlannedItems} ${totalPlannedItems === 1 ? 'food' : 'foods'} planned today` : 'Set up your weekly meal plan to get started'}>
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
 
         {/* Header — mirrors the exercise plan page */}
@@ -211,7 +237,7 @@ export default function MealPlanPage() {
             </h1>
             <p className="text-sm md:text-body-lg text-on-surface-variant">
               {totalPlannedItems > 0
-                ? `${totalPlannedItems} foods planned for today — tap to mark what you eat`
+                ? `${totalPlannedItems} ${totalPlannedItems === 1 ? 'food' : 'foods'} planned for today — tap to mark what you eat`
                 : 'Set up your weekly meals based on your goals and preferences'}
             </p>
           </div>
@@ -233,7 +259,7 @@ export default function MealPlanPage() {
             <div className="flex flex-col items-center shrink-0">
               <CalorieRing consumed={eatenTotals.calories} target={targetCals} />
               <p className="text-label-md text-on-surface-variant mt-2">
-                {totalEatenItems} / {totalPlannedItems} foods eaten
+                {totalEatenItems} / {totalPlannedItems} {totalPlannedItems === 1 ? 'food' : 'foods'} eaten
               </p>
             </div>
 
@@ -289,33 +315,78 @@ export default function MealPlanPage() {
                   section.items.map((item: any, idx: number) => {
                     const key = `${section.id}::${item.foodName || item.name}`;
                     const isEaten = loggedSet.has(key);
+                    const grams = selectionGrams(item);
+                    const hasGrams = typeof item.grams === 'number' && item.grams > 0;
+                    const gramsLabel =
+                      hasGrams || item.foodId
+                        ? `${grams} g`
+                        : typeof item.servingSize === 'string'
+                          ? item.servingSize
+                          : '1 serving';
+                    const isEditing =
+                      editing?.meal === section.id && editing.index === idx;
                     return (
-                      <button
+                      <div
                         key={idx}
-                        onClick={() => handleTick(section.id as any, item)}
                         className={`w-full flex items-center justify-between py-2.5 px-3 rounded-lg transition-all gap-2 ${
                           isEaten ? 'bg-primary/10 border border-primary/30' : 'hover:bg-surface-container-low border border-transparent'
                         }`}
                       >
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <button
+                          onClick={() => handleTick(section.id as any, item)}
+                          className="flex items-center gap-3 min-w-0 flex-1 text-left"
+                        >
                           <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 flex items-center justify-center transition-all shrink-0 ${
                             isEaten ? 'bg-primary border-primary' : 'border-outline-variant'
                           }`}>
                             {isEaten && <Check className="w-3.5 h-3.5 text-on-primary" />}
                           </div>
-                          <div className="text-left min-w-0 flex-1">
+                          <div className="min-w-0 flex-1">
                             <p className={`text-xs sm:text-body-md font-medium truncate ${isEaten ? 'text-on-surface font-semibold' : 'text-on-surface-variant'}`}>
                               {item.foodName || item.name}
                             </p>
                             <p className="text-[11px] sm:text-label-md text-on-surface-variant/80 truncate">
-                              {typeof item.servingSize === 'string' ? item.servingSize : item.servingSize?.label || '1 serving'}
+                              P {Math.round(item.protein || 0)}g · C {Math.round(item.carbs || 0)}g · F {Math.round(item.fat || 0)}g
                             </p>
                           </div>
+                        </button>
+                        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={1}
+                              step={10}
+                              autoFocus
+                              value={editGrams}
+                              onChange={(e) => setEditGrams(e.target.value)}
+                              onBlur={() => commitGramsEdit(section.id as any, idx, item)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  commitGramsEdit(section.id as any, idx, item);
+                                } else if (e.key === 'Escape') {
+                                  e.preventDefault();
+                                  setEditing(null);
+                                }
+                              }}
+                              aria-label={`Grams of ${item.foodName || item.name}`}
+                              className="w-16 px-1.5 py-1 bg-surface-container-lowest border border-primary/50 rounded-md text-xs font-semibold text-on-surface text-center focus:outline-none focus:ring-2 focus:ring-primary/40"
+                            />
+                          ) : (
+                            <button
+                              onClick={() => startGramsEdit(section.id as any, idx, item)}
+                              title="Tap to change grams"
+                              className="px-1.5 py-1 rounded-md border border-outline-variant/40 text-[11px] font-semibold text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
+                            >
+                              {gramsLabel}
+                            </button>
+                          )}
+                          <span className={`text-xs sm:text-body-md font-bold ml-0.5 ${isEaten ? 'text-primary' : 'text-on-surface-variant'}`}>
+                            {item.calories} kcal
+                          </span>
                         </div>
-                        <span className={`text-xs sm:text-body-md font-bold shrink-0 ml-1 ${isEaten ? 'text-primary' : 'text-on-surface-variant'}`}>
-                          {item.calories} kcal
-                        </span>
-                      </button>
+                      </div>
                     );
                   })
                 )}

@@ -158,6 +158,8 @@ export interface FoodSelection {
   fat: number;
   servingSize: string;
   quantity: number;
+  /** Total grams for this selection (source of truth for portion editing). */
+  grams?: number;
 }
 
 export interface DayFoodIntake {

@@ -1,5 +1,6 @@
 import { Profile, Calculations, MealEntry, ExerciseEntry } from './types';
 import { allFoods } from './food-database';
+import { findFood } from './food-portion';
 
 export function calculateBMI(weight: number, heightCm: number): { value: number; category: string } {
   const heightM = heightCm / 100;
@@ -111,7 +112,7 @@ export function getFoodById(id: string) {
 export function sumMealNutrition(meals: MealEntry[]): MealNutrition {
   let calories = 0, protein = 0, carbs = 0, fat = 0;
   for (const m of meals) {
-    const food = foodById.get(m.foodId);
+    const food = findFood(m.foodId, m.foodName);
     if (!food) continue;
     const q = m.quantity || 1;
     calories += food.nutrition.calories * q;

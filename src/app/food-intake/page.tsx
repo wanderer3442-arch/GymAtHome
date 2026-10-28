@@ -6,6 +6,13 @@ import { useStore } from '@/lib/store-context';
 import { allFoods } from '@/lib/food-database';
 import { FoodItem, FoodSelection, DayFoodIntake } from '@/lib/types';
 import {
+  makeSelection,
+  nutritionForGrams,
+  selectionGrams,
+  standardGrams,
+  withGrams,
+} from '@/lib/food-portion';
+import {
   ChevronRight,
   ChevronLeft,
   Search,
@@ -94,7 +101,8 @@ function AutocompleteInput({
         <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-outline-variant/40 rounded-xl shadow-xl z-50 max-h-80 overflow-y-auto">
               {suggestions.map((food, idx) => {
             const serving = food.servingSizes?.[0];
-            const servingLabel = serving ? `${serving.amount} ${serving.unit}` : '1 serving';
+            const servingLabel = serving?.label || `${standardGrams(food)} g`;
+            const perServing = nutritionForGrams(food, standardGrams(food));
             return (
               <button
                 key={`${food.id}-${idx}`}
@@ -107,11 +115,11 @@ function AutocompleteInput({
                     <p className="text-xs text-on-surface-variant mt-0.5">{servingLabel}</p>
                   </div>
                   <div className="text-right flex-shrink-0 ml-3">
-                    <p className="text-body-md font-bold text-primary">{food.nutrition.calories} kcal</p>
+                    <p className="text-body-md font-bold text-primary">{perServing.calories} kcal</p>
                     <div className="flex gap-2 text-xs text-on-surface-variant mt-0.5">
-                      <span>P: {food.nutrition.protein}g</span>
-                      <span>C: {food.nutrition.carbohydrates}g</span>
-                      <span>F: {food.nutrition.fat}g</span>
+                      <span>P: {perServing.protein}g</span>
+                      <span>C: {perServing.carbs}g</span>
+                      <span>F: {perServing.fat}g</span>
                     </div>
                   </div>
                 </div>
@@ -124,44 +132,54 @@ function AutocompleteInput({
   );
 }
 
-function FoodChip({ selection, onRemove, onQuantityChange }: { selection: FoodSelection; onRemove: () => void; onQuantityChange: (qty: number) => void }) {
-  const qty = selection.quantity || 1;
-  const scaledCals = Math.round(selection.calories * qty);
-  const scaledP = Math.round(selection.protein * qty);
-  const scaledC = Math.round(selection.carbs * qty);
-  const scaledF = Math.round(selection.fat * qty);
+function FoodChip({ selection, onRemove, onGramsChange }: { selection: FoodSelection; onRemove: () => void; onGramsChange: (grams: number) => void }) {
+  const grams = selectionGrams(selection);
+  const [draft, setDraft] = useState(String(grams));
+
+  useEffect(() => {
+    setDraft(String(grams));
+  }, [grams]);
+
+  const commit = () => {
+    const next = parseInt(draft, 10);
+    if (Number.isFinite(next) && next > 0) {
+      onGramsChange(next);
+      setDraft(String(next));
+    } else {
+      setDraft(String(grams));
+    }
+  };
 
   return (
-    <div className="inline-flex items-center gap-2 bg-surface-container-low border border-outline-variant/30 rounded-lg px-3 py-2">
+    <div className="flex items-center gap-2 bg-surface-container-low border border-outline-variant/30 rounded-lg px-3 py-2">
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <p className="text-sm font-semibold text-on-surface truncate">{selection.foodName}</p>
-          {qty > 1 && (
-            <span className="px-1.5 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded">
-              ×{qty}
-            </span>
-          )}
-        </div>
-        <p className="text-xs text-on-surface-variant">
-          {scaledCals} kcal | P: {scaledP}g | C: {scaledC}g | F: {scaledF}g
+        <p className="text-sm font-semibold text-on-surface truncate">{selection.foodName}</p>
+        <p className="text-xs text-on-surface-variant truncate">
+          {Math.round(selection.calories)} kcal | P: {Math.round(selection.protein)}g | C: {Math.round(selection.carbs)}g | F: {Math.round(selection.fat)}g
         </p>
       </div>
-      <div className="flex items-center gap-1 flex-shrink-0">
-        <button
-          onClick={() => onQuantityChange(Math.max(1, qty - 1))}
-          className="w-6 h-6 flex items-center justify-center rounded bg-surface-container-highest text-on-surface text-xs font-bold hover:bg-surface-container-high transition-colors"
-        >
-          −
-        </button>
-        <span className="text-xs font-semibold text-on-surface w-4 text-center">{qty}</span>
-        <button
-          onClick={() => onQuantityChange(qty + 1)}
-          className="w-6 h-6 flex items-center justify-center rounded bg-surface-container-highest text-on-surface text-xs font-bold hover:bg-surface-container-high transition-colors"
-        >
-          +
-        </button>
+      <div className="flex items-center gap-1 shrink-0">
+        <input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          step={10}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              commit();
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+          aria-label={`Grams of ${selection.foodName}`}
+          className="w-16 px-1.5 py-1 bg-surface-container-lowest border border-outline-variant/40 rounded text-xs font-semibold text-on-surface text-center focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+        />
+        <span className="text-xs font-semibold text-on-surface-variant">g</span>
       </div>
-      <button onClick={onRemove} className="p-1 hover:bg-error-container rounded transition-colors flex-shrink-0">
+      <button onClick={onRemove} className="p-1 hover:bg-error-container rounded transition-colors shrink-0">
         <X className="w-3.5 h-3.5 text-error" />
       </button>
     </div>
@@ -175,7 +193,9 @@ export default function FoodIntakePage() {
   const [allergyInput, setAllergyInput] = useState('');
   const [showAllergySuggestions, setShowAllergySuggestions] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState<'breakfast' | 'lunch' | 'dinner'>('breakfast');
-  const [addQuantity, setAddQuantity] = useState(1);
+  const [pendingFood, setPendingFood] = useState<FoodItem | null>(null);
+  const [portionGrams, setPortionGrams] = useState('100');
+  const [portionMeal, setPortionMeal] = useState<'breakfast' | 'lunch' | 'dinner'>('breakfast');
 
   const dayKey = dayKeys[currentDay];
   const dayData: DayFoodIntake = foodPreferences[dayKey] || { breakfast: [], lunch: [], dinner: [] };
@@ -188,31 +208,26 @@ export default function FoodIntakePage() {
   };
 
   const dayCals = ['breakfast', 'lunch', 'dinner'].reduce((sum, meal) => {
-    return sum + getMealEntries(dayData, meal).reduce((s, f) => s + f.calories * (f.quantity || 1), 0);
+    return sum + getMealEntries(dayData, meal).reduce((s, f) => s + f.calories, 0);
   }, 0);
 
   const weekTotalCals = dayKeys.reduce((sum, key) => {
     const day = foodPreferences[key] || { breakfast: [], lunch: [], dinner: [] };
     return sum + ['breakfast', 'lunch', 'dinner'].reduce((mSum, meal) => {
-      return mSum + getMealEntries(day, meal).reduce((s, f) => s + f.calories * (f.quantity || 1), 0);
+      return mSum + getMealEntries(day, meal).reduce((s, f) => s + f.calories, 0);
     }, 0);
   }, 0);
 
   const avgDailyCals = Math.round(weekTotalCals / 7);
 
-  const handleAddFood = (meal: 'breakfast' | 'lunch' | 'dinner', food: FoodItem) => {
-    const serving = food.servingSizes?.[0];
-    const selection: FoodSelection = {
-      foodId: food.id,
-      foodName: food.name,
-      calories: food.nutrition.calories,
-      protein: food.nutrition.protein,
-      carbs: food.nutrition.carbohydrates,
-      fat: food.nutrition.fat,
-      servingSize: serving ? `${serving.amount} ${serving.unit}` : '1 serving',
-      quantity: addQuantity,
-    };
+  const openPortion = (food: FoodItem) => {
+    setPendingFood(food);
+    setPortionGrams(String(standardGrams(food)));
+    setPortionMeal(selectedMeal);
+  };
 
+  const handleAddFood = (meal: 'breakfast' | 'lunch' | 'dinner', food: FoodItem, grams: number) => {
+    const selection = makeSelection(food, grams);
     setFoodPreferences({
       ...foodPreferences,
       [dayKey]: {
@@ -220,7 +235,7 @@ export default function FoodIntakePage() {
         [meal]: [...getMealEntries(dayData, meal), selection],
       },
     });
-    setAddQuantity(1);
+    setPendingFood(null);
   };
 
   const handleRemoveFood = (meal: 'breakfast' | 'lunch' | 'dinner', index: number) => {
@@ -234,10 +249,10 @@ export default function FoodIntakePage() {
     });
   };
 
-  const handleQuantityChange = (meal: 'breakfast' | 'lunch' | 'dinner', index: number, qty: number) => {
+  const handleGramsChange = (meal: 'breakfast' | 'lunch' | 'dinner', index: number, grams: number) => {
     const current = getMealEntries(dayData, meal);
     const updated = current.map((item: FoodSelection, i: number) =>
-      i === index ? { ...item, quantity: qty } : item
+      i === index ? withGrams(item, grams) : item
     );
     setFoodPreferences({
       ...foodPreferences,
@@ -385,26 +400,11 @@ export default function FoodIntakePage() {
             <div className="flex-1 min-w-0">
               <AutocompleteInput
                 placeholder="Search any food..."
-                onSelect={(food) => handleAddFood(selectedMeal, food)}
+                onSelect={openPortion}
                 allergies={allergies}
               />
             </div>
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 bg-surface-container-lowest border border-outline-variant/40 rounded-lg px-2">
-                <button
-                  onClick={() => setAddQuantity(Math.max(1, addQuantity - 1))}
-                  className="w-7 h-7 flex items-center justify-center rounded text-on-surface text-sm font-bold hover:bg-surface-container-high transition-colors"
-                >
-                  −
-                </button>
-                <span className="text-sm font-semibold text-on-surface w-5 text-center">{addQuantity}</span>
-                <button
-                  onClick={() => setAddQuantity(addQuantity + 1)}
-                  className="w-7 h-7 flex items-center justify-center rounded text-on-surface text-sm font-bold hover:bg-surface-container-high transition-colors"
-                >
-                  +
-                </button>
-              </div>
               <select
                 value={selectedMeal}
                 onChange={(e) => setSelectedMeal(e.target.value as 'breakfast' | 'lunch' | 'dinner')}
@@ -431,18 +431,18 @@ export default function FoodIntakePage() {
                     <h4 className="text-body-md font-bold text-gray-900 capitalize">{meal.id}</h4>
                   </div>
                   <span className="text-sm font-semibold text-gray-600">
-                    {entries.reduce((sum, s) => sum + s.calories * (s.quantity || 1), 0)} kcal
+                    {Math.round(entries.reduce((sum, s) => sum + s.calories, 0))} kcal
                   </span>
                 </div>
                 <div className="p-4">
                   {entries.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="space-y-2">
                       {entries.map((sel, i) => (
                         <FoodChip
                           key={i}
                           selection={sel}
                           onRemove={() => handleRemoveFood(meal.id as 'breakfast' | 'lunch' | 'dinner', i)}
-                          onQuantityChange={(qty) => handleQuantityChange(meal.id as 'breakfast' | 'lunch' | 'dinner', i, qty)}
+                          onGramsChange={(grams) => handleGramsChange(meal.id as 'breakfast' | 'lunch' | 'dinner', i, grams)}
                         />
                       ))}
                     </div>
@@ -461,7 +461,7 @@ export default function FoodIntakePage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
             {mealTypes.map((meal) => {
               const entries = getMealEntries(dayData, meal.id);
-              const cals = entries.reduce((sum, f) => sum + f.calories * (f.quantity || 1), 0);
+              const cals = Math.round(entries.reduce((sum, f) => sum + f.calories, 0));
               const Icon = meal.icon;
               return (
                 <div key={meal.id} className={`${meal.bg} rounded-lg p-3 text-center`}>
@@ -511,6 +511,128 @@ export default function FoodIntakePage() {
           </div>
         )}
       </div>
+
+      {/* Portion prompt — asks how many grams after a food is picked */}
+      {pendingFood && (() => {
+        const standard = standardGrams(pendingFood);
+        const parsed = parseInt(portionGrams, 10);
+        const grams = Number.isFinite(parsed) && parsed > 0 ? parsed : standard;
+        const preview = nutritionForGrams(pendingFood, grams);
+        const quickGrams = Array.from(new Set([50, 100, 150, 200, standard])).sort((a, b) => a - b);
+        const standardLabel = pendingFood.servingSizes?.[0]?.label;
+
+        return (
+          <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 sm:p-4">
+            <div className="bg-surface sm:rounded-2xl rounded-t-2xl shadow-xl w-full sm:max-w-md max-h-[88vh] overflow-y-auto">
+              <div className="flex items-center justify-between p-4 border-b border-outline-variant/50">
+                <div className="min-w-0">
+                  <h3 className="text-body-lg font-bold text-on-surface truncate">
+                    How much {pendingFood.name}?
+                  </h3>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    {standardLabel ? `Standard portion: ${standardLabel}` : 'Enter the amount you eat'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setPendingFood(null)}
+                  className="p-1.5 hover:bg-surface-container rounded-lg transition-colors shrink-0"
+                  aria-label="Cancel"
+                >
+                  <X className="w-5 h-5 text-on-surface-variant" />
+                </button>
+              </div>
+
+              <div className="p-4 space-y-4">
+                <div>
+                  <label className="text-xs font-semibold text-on-surface-variant mb-1.5 block">Grams</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      step={10}
+                      autoFocus
+                      value={portionGrams}
+                      onChange={(e) => setPortionGrams(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddFood(portionMeal, pendingFood, grams);
+                        }
+                      }}
+                      className="flex-1 px-3 py-2.5 bg-surface-container-lowest border border-outline-variant/40 rounded-lg text-lg font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                    />
+                    <span className="text-sm font-semibold text-on-surface-variant">g</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {quickGrams.map((g) => (
+                    <button
+                      key={g}
+                      onClick={() => setPortionGrams(String(g))}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                        grams === g
+                          ? 'bg-primary text-on-primary border-primary'
+                          : 'bg-surface-container-low text-on-surface border-outline-variant/40 hover:bg-surface-container'
+                      }`}
+                    >
+                      {g} g
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-4 gap-2 bg-surface-container-low rounded-lg p-3 text-center">
+                  <div>
+                    <p className="text-body-md font-bold text-primary">{preview.calories}</p>
+                    <p className="text-[10px] text-on-surface-variant">kcal</p>
+                  </div>
+                  <div>
+                    <p className="text-body-md font-bold text-on-surface">{preview.protein}g</p>
+                    <p className="text-[10px] text-on-surface-variant">Protein</p>
+                  </div>
+                  <div>
+                    <p className="text-body-md font-bold text-on-surface">{preview.carbs}g</p>
+                    <p className="text-[10px] text-on-surface-variant">Carbs</p>
+                  </div>
+                  <div>
+                    <p className="text-body-md font-bold text-on-surface">{preview.fat}g</p>
+                    <p className="text-[10px] text-on-surface-variant">Fat</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-on-surface-variant mb-1.5 block">Add to</label>
+                  <select
+                    value={portionMeal}
+                    onChange={(e) => setPortionMeal(e.target.value as 'breakfast' | 'lunch' | 'dinner')}
+                    className="w-full px-3 py-2.5 bg-surface-container-lowest border border-outline-variant/40 rounded-lg text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                  >
+                    {mealTypes.map((meal) => (
+                      <option key={meal.id} value={meal.id}>{meal.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => setPendingFood(null)}
+                    className="flex-1 h-11 rounded-xl text-label-md font-bold bg-surface-container-highest text-on-surface hover:bg-surface-container-high transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleAddFood(portionMeal, pendingFood, grams)}
+                    className="flex-1 h-11 rounded-xl text-label-md font-bold bg-primary text-on-primary hover:bg-primary/90 transition-colors shadow-sm"
+                  >
+                    Add {grams} g
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </DashboardLayout>
   );
 }

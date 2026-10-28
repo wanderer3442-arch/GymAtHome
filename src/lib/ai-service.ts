@@ -541,11 +541,11 @@ HTML FORMATTING — for multi-part answers you may use this safe HTML subset (th
 - If the answer contains a table or box, use HTML tags throughout that answer (bold = <strong>, bullets = <ul>); short one-liner answers can stay plain text with **bold** and emoji
 
 MEAL PLAN FLOW — when the user asks for a meal plan, diet plan, or "plan my meals":
-1. Do NOT write the full plan immediately. First ask ONE short round of concrete portion questions about how much of each food they actually eat every day — e.g. "How many idlis do you eat for breakfast?", "How many rotis at lunch?", "How much rice (how many katoris) for dinner?", "Tea with sugar — how many cups a day?". Keep it to 3-4 quantity questions in one short paragraph, like a friend asking about your routine.
-2. When they answer with quantities (e.g. "2 idlis, 3 rotis, 1 katori rice"), THEN build the plan using EXACTLY those foods and those quantities in every slot — "2 idlis + sambar", never vague words like "a serving". If they already gave quantities up front, skip the questions and build directly.
+1. Do NOT write the full plan immediately. First ask ONE short round of concrete portion questions about how much of each food they actually eat every day — ask for grams and give a familiar reference (1 idli ≈ 50 g, 1 roti ≈ 40 g, 1 katori ≈ 150 g, 1 cup ≈ 200 g) — e.g. "How many idlis (or grams) do you eat for breakfast?", "How many rotis at lunch — 1 roti is about 40 g?", "How much rice for dinner — 1 katori is about 150 g?", "Tea with sugar — how many cups a day?". Keep it to 3-4 quantity questions in one short paragraph, like a friend asking about your routine.
+2. When they answer with quantities (e.g. "2 idlis, 3 rotis, 1 katori rice"), THEN build the plan using EXACTLY those foods and those quantities in every slot. Every countable food MUST include its amount in grams in parentheses — "2 idlis (100 g) + sambar (150 g)", never vague words like "a serving". Only water, salt, spices and "to taste" items may skip the gram amount. If they already gave quantities up front, skip the questions and build directly.
 3. Always END the final plan reply with exactly one line in this format (the chat app turns it into a preview the user can save into their Meal Plan):
-JSON: [{"day":"Today","meals":["Breakfast: 2 idlis + sambar","Mid-morning: 1 banana","Lunch: 3 rotis + dal","Snack: 1 cup curd","Dinner: 1 katori rice + mixed veg"]}]
-Every meal string MUST start with its slot name and a colon — Breakfast:, Mid-morning:, Lunch:, Snack:, Dinner: — followed by the REAL quantities they told you. Use 4-6 short strings. Put the JSON line last, nothing after it, and keep the human-readable plan above it.
+JSON: [{"day":"Today","meals":["Breakfast: 2 idlis (100 g) + sambar (150 g)","Mid-morning: 1 banana (118 g)","Lunch: 3 rotis (120 g) + dal (150 g)","Snack: 1 cup curd (200 g)","Dinner: 1 katori rice (150 g) + mixed veg (150 g)"]}]
+Every meal string MUST start with its slot name and a colon — Breakfast:, Mid-morning:, Lunch:, Snack:, Dinner: — followed by the REAL foods, their quantities AND the gram amount in parentheses. Use 4-6 short strings. Put the JSON line last, nothing after it, and keep the human-readable plan above it.
 4. If the same message ALSO asks for a workout plan, output the meal JSON line first and then the exercise JSON line directly after it (two plan lines total, nothing else after them).
 
 EXERCISE PLAN FLOW — when the user asks for a workout plan, exercise plan, or weekly gym schedule:
@@ -559,7 +559,8 @@ CSV PLAN IMPORT — when the message contains an uploaded CSV of the user's exis
 2. Treat every CSV row as real data the user already follows — do NOT ask portion questions, do NOT replace their foods/exercises with generic ones, and do NOT drop rows unless they are clearly blank.
 3. Detect the plan type: food columns → meal JSON; exercise/sets/reps columns → exercise JSON. If the file has both, emit both JSON lines (meal first, then exercise).
 4. Keep the user's day names when present; otherwise group rows sensibly (e.g. one day for a diet list, Monday…Sunday for a split). For meals, prefix each string with Breakfast:/Mid-morning:/Lunch:/Snack:/Dinner: as above; for exercises use "Name — 3 × 12".
-5. Above the JSON lines, give a 3-6 line summary of what you imported (rows read, days, items, anything skipped). Never ask the user to type the plan again.${profileBlock}${conditionsBlock}${allergiesBlock}${todayBlock}`;
+5. When the CSV gives a quantity or serving but no grams, convert it to grams using standard portions (1 roti ≈ 40 g, 1 idli ≈ 50 g, 1 katori ≈ 150 g, 1 cup ≈ 200 g) and include the gram amount in parentheses in every meal string, e.g. "Lunch: 3 rotis (120 g) + dal (150 g)". Only water, salt, spices and "to taste" items may skip grams.
+6. Above the JSON lines, give a 3-6 line summary of what you imported (rows read, days, items, anything skipped). Never ask the user to type the plan again.${profileBlock}${conditionsBlock}${allergiesBlock}${todayBlock}`;
 
   const messages: Array<{ role: string; content: any }> = [
     { role: 'system', content: systemPrompt },

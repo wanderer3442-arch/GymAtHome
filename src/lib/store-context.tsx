@@ -20,6 +20,7 @@ import { calculateAll } from './calculations';
 import { allFoods } from './food-database';
 import { BADGE_CATALOG, STREAK_BADGE_ID, STREAK_TIERS, streakTierIndex } from './badges';
 import { keyOfTimestamp, localDateKey, streakEndingToday } from './date';
+import { migrateFoodPreferences } from './food-portion';
 
 // Single-device store. Replaces the old per-account `gymathome_store_<id>` keys
 // left behind by the removed sign-in flow.
@@ -175,7 +176,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (parsed.habits) setHabits(parsed.habits);
         if (parsed.workoutPlan) setWorkoutPlan(parsed.workoutPlan);
         if (parsed.bodyMetrics) setBodyMetrics(parsed.bodyMetrics);
-        if (parsed.foodPreferences) setFoodPreferences(parsed.foodPreferences);
+        if (parsed.foodPreferences) setFoodPreferences(migrateFoodPreferences(parsed.foodPreferences));
         if (parsed.waterLogs) setWaterLogs(parsed.waterLogs);
         if (parsed.sleepLogs) setSleepLogs(parsed.sleepLogs);
         if (parsed.badges) {
