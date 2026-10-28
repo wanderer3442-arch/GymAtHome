@@ -488,13 +488,22 @@ export default function FoodIntakePage() {
           </button>
 
           <button
-            onClick={() => currentDay < 6 && setCurrentDay(currentDay + 1)}
-            disabled={currentDay === 6}
+            onClick={() => {
+              if (currentDay < 6) setCurrentDay(currentDay + 1);
+              else if (allDaysComplete) window.location.href = '/generated-meal-plan';
+            }}
+            disabled={currentDay === 6 && !allDaysComplete}
             className="flex items-center gap-2 px-4 md:px-6 py-3 bg-primary hover:bg-primary/90 text-on-primary rounded-lg text-sm md:text-label-md font-bold transition-all shadow-md hover:shadow-lg disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            {currentDay === 6 ? 'Complete' : (currentDay < 6 ? <span className="sm:hidden">Next</span> : null)}
-            {currentDay === 6 ? 'Complete' : <span className="hidden sm:inline">Next Day</span>}
-            {currentDay < 6 && <ChevronRight className="w-4 h-4" />}
+            {currentDay === 6 ? (
+              'Save & Complete'
+            ) : (
+              <>
+                <span className="sm:hidden">Save & next</span>
+                <span className="hidden sm:inline">Save & Next Day</span>
+                <ChevronRight className="w-4 h-4" />
+              </>
+            )}
           </button>
         </div>
 
