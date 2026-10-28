@@ -30,7 +30,7 @@ export function hasGeminiKey(): boolean {
   return !!getGeminiKey() || !!AI_PROXY_URL;
 }
 
-// ─── Gemini API Call ─────────────────────────────────────────────────────────
+// ─── AI call (Groq direct, or the Cloudflare proxy) ──────────────────────────
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -231,7 +231,7 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   };
 }
 
-// ─── Food Recognition (Gemini Vision) ────────────────────────────────────────
+// ─── Food Recognition (multimodal models) ────────────────────────────────────
 
 export interface FoodSuggestion {
   food: FoodItem;
@@ -577,7 +577,7 @@ CSV PLAN IMPORT — when the message contains an uploaded CSV of the user's exis
   }
 
   if (imageDataUrl) {
-    // Vision turn — text + image in one user message (OpenAI/Gemini multimodal)
+    // Vision turn - text + image in one user message (OpenAI-style multimodal)
     messages.push({
       role: 'user',
       content: [
@@ -596,5 +596,5 @@ CSV PLAN IMPORT — when the message contains an uploaded CSV of the user's exis
     return await callGemini(messages, 8192, onDelta);
   }
 
-  throw new Error('AI not configured. Set a proxy URL or add a Gemini key in Dev Settings.');
+  throw new Error('AI not configured. Set a proxy URL or add a Groq key in Dev Settings.');
 }
