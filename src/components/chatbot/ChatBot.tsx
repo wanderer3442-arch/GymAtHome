@@ -779,7 +779,7 @@ export default function ChatBot({ mode = 'floating', onClose }: ChatBotProps) {
         content:
           `✅ Saved **${result.added}** food${result.added === 1 ? '' : 's'} across **${result.days}** day${result.days === 1 ? '' : 's'} to your Meal Plan.` +
           (result.unmatched > 0
-            ? `\n${result.unmatched} item${result.unmatched === 1 ? '' : 's'} weren't in the food database — they're listed by name with 0 kcal until you log them.`
+            ? `\n${result.unmatched} item${result.unmatched === 1 ? " wasn't" : "s weren't"} in the food database — ${result.unmatched === 1 ? 'it is' : 'they are'} listed by name with 0 kcal until you log ${result.unmatched === 1 ? 'it' : 'them'}.`
             : '') +
           `\n\nOpen **Meal Plan** to see it.`,
         timestamp: stamp(),
@@ -823,7 +823,7 @@ export default function ChatBot({ mode = 'floating', onClose }: ChatBotProps) {
         content:
           `✅ Saved **${result.added}** exercise${result.added === 1 ? '' : 's'} across **${result.days}** day${result.days === 1 ? '' : 's'} to your Exercise Plan.` +
           (result.matched < result.added
-            ? `\n${result.added - result.matched} weren't in the built-in library, so they'll show by name only.`
+            ? `\n${result.added - result.matched} ${result.added - result.matched === 1 ? "wasn't" : "weren't"} in the built-in library, so ${result.added - result.matched === 1 ? "it'll" : "they'll"} show by name only.`
             : '') +
           `\n\nOpen **Exercise Plan** to see it.`,
         timestamp: stamp(),
