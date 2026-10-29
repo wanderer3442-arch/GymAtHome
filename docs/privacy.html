@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Privacy Policy — Gym at Home</title>
-<meta name="description" content="Privacy Policy for the Gym at Home mobile app. Your data stays on your device.">
+<meta name="description" content="Privacy Policy for the Gym at Home mobile app. Most app data is stored locally; AI and weather features send limited data to service providers.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#127947;</text></svg>">
 <style>
   :root {
@@ -126,31 +126,36 @@
   <header class="doc-head">
     <p class="doc-org">Gym at Home</p>
     <h1 class="doc-title">Privacy Policy</h1>
-    <p class="doc-meta"><span>Effective September 28, 2026</span> &nbsp;·&nbsp; Applies to the Gym at Home mobile app</p>
+    <p class="doc-meta"><span>Effective October 29, 2026</span> &nbsp;·&nbsp; Applies to the Gym at Home mobile app</p>
   </header>
 
   <section>
-    <h2><span class="num">01</span> Your data stays on your device</h2>
-    <p>Gym at Home stores everything locally &mdash; your account, workouts, meals, health metrics and preferences. There is no user database on our servers, and app backups to the cloud are disabled. Removing the app removes your data.</p>
+    <h2><span class="num">01</span> Most app data stays on your device</h2>
+    <p>Your profile, workouts, meals, health metrics, preferences, profile photo and chat history are stored on your device. The app has no user account database or app-owned cloud sync, and Android app backups are disabled. AI prompts and weather requests are exceptions: the information described below leaves your device. Delete All Data erases Gym at Home data stored on this device; it cannot erase information already processed by an external provider. Uninstalling the Android app removes its device-local app data.</p>
   </section>
 
   <section>
-    <h2><span class="num">02</span> No tracking, no ads, no selling</h2>
-    <p>We do not use advertising, analytics or tracking SDKs, and we never sell or share your personal information. Your password is stored only on your device, hashed with PBKDF2.</p>
+    <h2><span class="num">02</span> No advertising or analytics SDKs</h2>
+    <p>The app does not include advertising or analytics SDKs. There is no account or password. To provide AI and weather features, the app sends limited information to the service providers described below; those transfers mean information does leave your device.</p>
   </section>
 
   <section>
-    <h2><span class="num">03</span> AI features (Google Gemini)</h2>
-    <p>When you chat with the AI assistant, ask for photo-based food recognition or request a plan, the text (and any photo you choose to attach) is sent through our proxy to Google Gemini to generate a reply. That prompt may include health details you type. We do not store these conversations, and Google processes the request to generate the response.</p>
+    <h2><span class="num">03</span> AI features</h2>
+    <p>When you use an AI feature, your request is sent through our Cloudflare Worker proxy to the AI provider configured for that service (Groq or Google Gemini). A chat request can include your message, your name, profile details such as age, sex, height, weight and goals, health conditions and allergies, relevant daily meal/workout/water/sleep logs, and up to 10 recent chat messages. If you submit a CSV through chat, its contents are included. The Worker uses the connecting IP address for rate limiting and forwards the request to the configured AI provider. The app and Worker code do not save prompts or replies to an app-owned server database; chat history is saved locally on your device. The AI provider processes requests under its own terms and privacy practices, which may permit limited retention for service operation or abuse prevention. Clearing local chat or deleting local app data does not delete information already sent to a provider.</p>
   </section>
 
   <section>
-    <h2><span class="num">04</span> What we can see</h2>
-    <p>We have no access to your account, your logs or your files. We cannot recover your data for you, so export reports matter if you want a backup.</p>
+    <h2><span class="num">04</span> Weather and location (Open-Meteo)</h2>
+    <p>After you grant location permission, the app can receive location updates while it is running and use them for weather. It sends your coordinates directly to Open-Meteo (open-meteo.com); updates may trigger refreshed requests. The app does not persist a location history. Open-Meteo and network providers may process request metadata, including IP address and coordinates, under their own policies. You can deny location; other app features remain available.</p>
   </section>
 
   <section>
-    <h2><span class="num">05</span> Contact</h2>
+    <h2><span class="num">05</span> Data deletion and access</h2>
+    <p>We do not have a user database from which to retrieve your locally stored profile, logs or files. The AI proxy uses your IP address for rate limiting and relays AI requests, but does not write prompts or replies to an app-owned database. External providers may independently process or retain request data under their policies. Export reports if you want a copy of locally stored data.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">06</span> Contact</h2>
     <p>Questions about privacy or your data? Email <a href="mailto:gymathome.app@gmail.com">gymathome.app@gmail.com</a>.</p>
   </section>
 

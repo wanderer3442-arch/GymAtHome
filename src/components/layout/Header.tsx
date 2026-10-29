@@ -84,7 +84,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
             <div className="absolute right-0 top-12 w-56 bg-surface-container-lowest border border-outline-variant/30 rounded-xl shadow-elevated z-50 overflow-hidden">
               <div className="p-4 border-b border-outline-variant/30">
                 <p className="text-sm font-bold text-on-surface">{displayName}</p>
-                <p className="text-xs text-on-surface-variant">All data stays on this device</p>
+                <p className="text-xs text-on-surface-variant">Most data stays on this device</p>
               </div>
               <div className="py-2">
                 <button

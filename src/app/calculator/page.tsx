@@ -29,7 +29,7 @@ const activityToLevel: Record<string, ActivityLevel> = {
   extra_active: '1.9',
 };
 
-const levelToActivity: Record<string, string> = {
+const levelToActivity: Record<ActivityLevel, 'sedentary' | 'light' | 'moderate' | 'very_active' | 'extra_active'> = {
   '1.2': 'sedentary',
   '1.375': 'light',
   '1.55': 'moderate',
@@ -340,15 +340,20 @@ export default function CalculatorPage() {
                   </div>
                 </div>
               </div>
+            <p className="mt-4 text-xs leading-relaxed text-on-surface-variant">
+              When you tap Save, Android will ask about location and reminder permissions. If
+              allowed, your coordinates are sent to Open-Meteo for weather; you can deny either
+              permission and continue using the app.
+            </p>
               <button
                 onClick={() => {
                   if (!results) return;
                   updateProfile({
                     gender,
-                    age: parseFloat(age) as any,
-                    height: parseFloat(height) as any,
-                    weight: parseFloat(weight) as any,
-                    activityLevel: levelToActivity[activity] as any,
+                    age: parseFloat(age),
+                    height: parseFloat(height),
+                    weight: parseFloat(weight),
+                    activityLevel: levelToActivity[activity],
                     goal,
                   });
                   setIsProfileSet(true);

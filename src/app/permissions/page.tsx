@@ -149,8 +149,11 @@ export default function PermissionsPage() {
                 <StatusChip status={locStatus} />
               </div>
               <p className="text-label-md text-on-surface-variant mt-1">
-                Uses your GPS position to show weather for outdoor workout planning. No API key,
-                nothing leaves your phone except the weather lookup itself.
+                After you grant permission, the app can receive location updates while it is
+                running and use them for weather. Coordinates are sent directly to Open-Meteo
+                (open-meteo.com); updates can trigger refreshed requests. Gym at Home does not
+                save a location history; Open-Meteo and network providers may process request
+                metadata under their own policies.
               </p>
             </div>
           </div>
@@ -185,8 +188,9 @@ export default function PermissionsPage() {
         <p className="flex items-start justify-center gap-1.5 text-[11px] text-on-surface-variant mt-4 text-center">
           <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-0.5" />
           <span>
-            All data stays on this device. If Android blocked a permission, use Open Android
-            Settings → Permissions to re-enable it.
+            Most app data stays on this device. AI and weather requests send limited information
+            to external providers as explained in the Privacy Policy. If Android blocked a
+            permission, use Open Android Settings → Permissions to re-enable it.
           </span>
         </p>
       </div>

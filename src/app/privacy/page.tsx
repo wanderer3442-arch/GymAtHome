@@ -26,13 +26,13 @@ const permissions = [
     icon: MapPin,
     name: 'Location (approximate or precise)',
     android: 'ACCESS_COARSE_LOCATION · ACCESS_FINE_LOCATION',
-    body: 'One reading is used only to look up the current temperature so hydration and heat advice match your weather. The coordinates are not stored as a location history and are never sent to our servers. Asked at the same moment as notifications, and asked again only if you tap Allow yourself.',
+    body: 'After you grant location permission, the app can receive location updates while it is running and use them for weather. It sends the coordinates directly to Open-Meteo (open-meteo.com); updates may cause refreshed weather requests. The app does not save a location history. Open-Meteo and network providers may process request metadata, including IP address and coordinates in the request URL, under their own policies.',
   },
   {
     icon: Wifi,
     name: 'Internet access',
     android: 'INTERNET',
-    body: 'Needed for the AI chat, the weather lookup and AI meal/workout plans. Android grants this at install, so you will not see a dialog for it.',
+    body: 'Needed for AI requests and weather lookups. Android grants this at install, so you will not see a dialog for it.',
   },
   {
     icon: Settings,
@@ -45,23 +45,28 @@ const permissions = [
 const sections = [
   {
     icon: HardDrive,
-    title: 'Your data stays on your device',
-    body: 'Gym at Home stores everything locally — your account, workouts, meals, health metrics and preferences. There is no user database on our servers, and app backups to the cloud are disabled. Removing the app removes your data.',
+    title: 'Most app data stays on your device',
+    body: 'Your profile, workouts, meals, health metrics, preferences, profile photo and chat history are stored on your device. The app has no user account database or app-owned cloud sync, and Android app backups are disabled. AI prompts and weather requests are exceptions: the information described below leaves your device. Delete All Data erases Gym at Home data stored on this device; it cannot erase information already processed by an external provider. Uninstalling the Android app removes its device-local app data.',
   },
   {
     icon: EyeOff,
-    title: 'No tracking, no ads, no selling',
-    body: 'We do not use advertising, analytics or tracking SDKs, and we never sell or share your personal information. Your password is stored only on your device, hashed with PBKDF2.',
+    title: 'No advertising or analytics SDKs',
+    body: 'The app does not include advertising or analytics SDKs. There is no account or password. To provide AI and weather features, the app sends limited information to the service providers described below; those transfers mean information does leave your device.',
   },
   {
     icon: Sparkles,
-    title: 'AI features (Groq)',
-    body: 'When you chat with the AI assistant and request a plan, the text you type (plus your profile numbers you have filled in) is sent through our proxy to Groq to generate a reply. That prompt may include health details you type. We do not store these conversations, and Groq processes the request to generate the response.',
+    title: 'AI features',
+    body: 'When you use an AI feature, your request is sent through our Cloudflare Worker proxy to the AI provider configured for that service (Groq or Google Gemini). A chat request can include your message, your name, profile details such as age, sex, height, weight and goals, health conditions and allergies, relevant daily meal/workout/water/sleep logs, and up to 10 recent chat messages. If you submit a CSV through chat, its contents are included. The Worker uses the connecting IP address for rate limiting and forwards the request to the configured AI provider. The app and Worker code do not save prompts or replies to an app-owned server database; chat history is saved locally on your device. The AI provider processes requests under its own terms and privacy practices, which may permit limited retention for service operation or abuse prevention. Clearing local chat or deleting local app data does not delete information already sent to a provider.',
+  },
+  {
+    icon: MapPin,
+    title: 'Weather (Open-Meteo)',
+    body: 'After you grant location permission, the app can receive location updates while it is running and use them for weather. It sends your coordinates directly to Open-Meteo (open-meteo.com); updates may trigger refreshed requests. The app does not persist a location history. Open-Meteo and network providers may process request metadata, including IP address and coordinates, under their own policies. You can deny location; other app features remain available.',
   },
   {
     icon: ShieldCheck,
-    title: 'What we can see',
-    body: 'We have no access to your account, your logs or your files. We cannot recover your data for you, so export reports matter if you want a backup.',
+    title: 'Data deletion and access',
+    body: 'We do not have a user database from which to retrieve your locally stored profile, logs or files. The AI proxy uses your IP address for rate limiting and relays AI requests, but does not write prompts or replies to an app-owned database. External providers may independently process or retain request data under their policies. Export reports if you want a copy of locally stored data.',
   },
 ];
 
@@ -75,7 +80,7 @@ export default function PrivacyPage() {
             <h2 className="text-headline-sm font-semibold">Privacy Policy</h2>
           </div>
           <p className="text-body-md text-on-surface-variant">
-            Effective October 27, 2026 · Applies to the Gym at Home mobile app.
+            Effective October 29, 2026 · Applies to the Gym at Home mobile app.
           </p>
         </div>
 
