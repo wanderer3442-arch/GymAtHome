@@ -88,7 +88,7 @@ Use one of these for A/B testing:
 - Category: Health & Fitness
 - Tags: Fitness, Home workouts, Meal planning, Habit tracker, AI coach
 - Contact email: gymathome.app@gmail.com
-- Privacy policy: enter the public URL where the current Gym at Home policy is hosted; verify it opens without login and matches the in-app policy
+- Privacy policy: https://wanderer3442-arch.github.io/GymAtHome/privacy.html (publicly reachable and updated October 29, 2026)
 - App access: No server login. If onboarding creates a local profile, state that all features are available after creating it. If a login screen exists, provide test credentials.
 - Ads: No
 - In-app purchases: No
